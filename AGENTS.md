@@ -51,10 +51,34 @@
 
 - Use modern annotations such as `str | None` and `list[str]`.
 
-- Use `from __future__ import annotations` in every Python module.
+- Use `from __future__ import annotations` in every hand-written Python module.
 
 - Use `ruff` for linting and formatting. Its configuration lives in
   `pyproject.toml`.
+
+## Code structure
+
+- Before adding a private module-level helper, check whether conda,
+  `cyclonedx-python-lib`, `packageurl-python`, or the standard library already
+  provides the operation.
+
+- Keep a private helper only when it owns a stable format mapping, graph
+  operation, validation rule, or privacy boundary. Inline short one-use glue at
+  its call site.
+
+- Do not introduce a wrapper class solely to turn exporter helpers into
+  methods. This package receives conda and CycloneDX model objects whose classes
+  already own their data. Add an internal class only when it has durable state
+  or behavior that those models cannot own.
+
+- Do not create a public utility or shared module until a second format needs
+  the same behavior. Keep format-specific functions in their format module.
+
+- Do not use section comments to group functions or tests. Rely on ordering and
+  module boundaries. If a file needs section headings, split it by behavior.
+
+- Comments explain non-obvious intent, trade-offs, or upstream constraints.
+  Do not narrate what the next line already says.
 
 ## Exporter design
 
@@ -114,8 +138,9 @@
   every component, including known leaves.
 
 - Mark root assembly completeness `unknown` when conda metadata cannot prove
-  it. Mark a component's dependency set `incomplete` when a declared dependency
-  target is absent from the resolved records.
+  it, and `incomplete` when input data identifies omitted constituents. Mark a
+  component's dependency set `incomplete` when a declared dependency target is
+  absent from the resolved records.
 
 - `cyclonedx-python-lib` 11.x cannot model `compositions` and always creates a
   serial number. Keep the post-serialization adjustment limited to removing

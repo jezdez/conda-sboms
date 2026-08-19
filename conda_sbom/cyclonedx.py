@@ -37,7 +37,8 @@ if TYPE_CHECKING:
     from conda.models.records import PackageRecord
     from cyclonedx.model.bom_ref import BomRef
 
-_PLACEHOLDER_UUID = UUID("00000000-0000-4000-8000-000000000000")
+# cyclonedx-python-lib requires a UUID even though the serialized field is removed.
+_SERIAL_NUMBER_PLACEHOLDER = UUID("00000000-0000-4000-8000-000000000000")
 
 FORMAT: Final = "cyclonedx-json"
 ALIASES: Final = ("cyclonedx", "cdx-json")
@@ -56,7 +57,7 @@ def export_cyclonedx_json(environment: Environment) -> str:
     records = sorted(
         environment.explicit_packages,
         key=lambda record: (
-            _normalized_name(record.name),
+            record.name.lower(),
             str(record.version),
             record.build,
             record.subdir,
@@ -64,13 +65,13 @@ def export_cyclonedx_json(environment: Environment) -> str:
     )
     components = [_package_component(record) for record in records]
     refs_by_name = {
-        _normalized_name(record.name): component.bom_ref
+        record.name.lower(): component.bom_ref
         for record, component in zip(records, components, strict=True)
     }
-    edges, missing_dependency_edges, incomplete_dependency_refs = _dependency_edges(
-        records, refs_by_name
+    edges, missing_dependency_edges, incomplete_dependency_refs = (
+        _package_dependency_graph(records, refs_by_name)
     )
-    root_dependencies = _root_dependencies(
+    root_dependencies = _root_dependency_refs(
         environment.requested_packages,
         edges,
         refs_by_name,
@@ -111,9 +112,9 @@ def export_cyclonedx_json(environment: Environment) -> str:
         purl=PackageURL(type="pypi", name="conda-sbom", version=__version__),
     )
     bom = Bom(
-        serial_number=_PLACEHOLDER_UUID,
+        serial_number=_SERIAL_NUMBER_PLACEHOLDER,
         metadata=BomMetaData(
-            timestamp=_timestamp(),
+            timestamp=_creation_timestamp(),
             tools=ToolRepository(components=[tool]),
             component=root,
         ),
@@ -147,24 +148,29 @@ def export_cyclonedx_json(environment: Environment) -> str:
 
 
 def _package_component(record: PackageRecord) -> Component:
-    purl = _package_url(record)
+    """Map one exact conda package record to a CycloneDX component."""
+    raw_filename = getattr(record, "fn", None)
+    filename = None
+    if raw_filename:
+        filename = str(raw_filename).replace("\\", "/").rsplit("/", 1)[-1]
+        filename = filename.split("?", 1)[0].split("#", 1)[0] or None
+    purl = _conda_purl(record, filename)
     hashes = []
     sha256 = getattr(record, "sha256", None)
     md5 = getattr(record, "md5", None)
     if sha256:
-        hashes.append(_hash(HashAlgorithm.SHA_256, sha256, record.name))
+        hashes.append(_validated_hash(HashAlgorithm.SHA_256, sha256, record.name))
     if md5:
-        hashes.append(_hash(HashAlgorithm.MD5, md5, record.name))
+        hashes.append(_validated_hash(HashAlgorithm.MD5, md5, record.name))
 
     properties = [
         Property(name="conda:package:build", value=record.build),
         Property(name="conda:package:build-number", value=str(record.build_number)),
         Property(name="conda:package:subdir", value=record.subdir),
     ]
-    channel = _channel_name(record)
+    channel = _safe_channel_name(record)
     if channel:
         properties.append(Property(name="conda:package:channel", value=channel))
-    filename = getattr(record, "fn", None)
     size = getattr(record, "size", None)
     if filename:
         properties.append(Property(name="conda:package:filename", value=filename))
@@ -173,7 +179,7 @@ def _package_component(record: PackageRecord) -> Component:
 
     external_references = []
     url = getattr(record, "url", None)
-    sanitized_url = _sanitize_url(str(url)) if url else None
+    sanitized_url = _sanitized_remote_url(str(url)) if url else None
     if sanitized_url:
         external_references.append(
             ExternalReference(
@@ -206,6 +212,7 @@ def _root_component(
     missing_dependency_edges: int,
     root_source: str,
 ) -> Component:
+    """Describe the exported environment without exposing its local prefix."""
     name = environment.name or "conda-environment"
     properties = [
         Property(name="conda:environment:platform", value=environment.platform),
@@ -247,17 +254,19 @@ def _root_component(
     )
 
 
-def _package_url(record: PackageRecord) -> PackageURL:
+def _conda_purl(record: PackageRecord, filename: str | None) -> PackageURL:
+    """Build the current package-url conda identity in one changeable seam."""
     qualifiers = {
         "build": record.build,
         "subdir": record.subdir,
     }
-    channel = _channel_name(record)
+    channel = _safe_channel_name(record)
     if channel:
         qualifiers["channel"] = channel
-    archive_type = _archive_type(getattr(record, "fn", None))
-    if archive_type:
-        qualifiers["type"] = archive_type
+    if filename and filename.endswith(".conda"):
+        qualifiers["type"] = "conda"
+    elif filename and filename.endswith(".tar.bz2"):
+        qualifiers["type"] = "tar.bz2"
     return PackageURL(
         type="conda",
         name=str(record.name),
@@ -266,19 +275,21 @@ def _package_url(record: PackageRecord) -> PackageURL:
     )
 
 
-def _dependency_edges(
+def _package_dependency_graph(
     records: Iterable[PackageRecord],
     refs_by_name: Mapping[str, BomRef],
 ) -> tuple[dict[BomRef, list[BomRef]], int, set[BomRef]]:
+    """Build package edges and identify records with unresolved dependencies."""
     edges: dict[BomRef, list[BomRef]] = {}
     missing_edges = 0
     incomplete_refs: set[BomRef] = set()
     for record in records:
-        record_ref = refs_by_name[_normalized_name(record.name)]
+        record_ref = refs_by_name[record.name.lower()]
         dependencies = set()
         for dependency in record.depends:
-            dependency_name = MatchSpec(dependency).name
-            dependency_ref = refs_by_name.get(_normalized_name(dependency_name))
+            dependency_spec = MatchSpec(dependency)
+            dependency_name = dependency_spec.name
+            dependency_ref = refs_by_name.get((dependency_name or "").lower())
             if dependency_ref is None:
                 missing_edges += 1
                 incomplete_refs.add(record_ref)
@@ -288,17 +299,18 @@ def _dependency_edges(
     return edges, missing_edges, incomplete_refs
 
 
-def _root_dependencies(
+def _root_dependency_refs(
     requested_packages: Iterable[MatchSpec],
     edges: Mapping[BomRef, list[BomRef]],
     refs_by_name: Mapping[str, BomRef],
 ) -> list[BomRef]:
+    """Choose root edges and cover disconnected cycles when roots are inferred."""
     if requested_packages:
         return sorted(
             {
                 reference
                 for spec in requested_packages
-                if (reference := refs_by_name.get(_normalized_name(spec.name)))
+                if (reference := refs_by_name.get((spec.name or "").lower()))
                 is not None
             },
             key=lambda ref: ref.value,
@@ -312,30 +324,24 @@ def _root_dependencies(
         (reference for reference, count in incoming.items() if count == 0),
         key=lambda ref: ref.value,
     )
-    reachable = _reachable(roots, edges)
-    for reference in sorted(edges, key=lambda ref: ref.value):
-        if reference not in reachable:
+    reachable: set[BomRef] = set()
+    for reference in [*roots, *sorted(edges, key=lambda ref: ref.value)]:
+        if reference in reachable:
+            continue
+        if reference not in roots:
             roots.append(reference)
-            reachable.update(_reachable([reference], edges))
+        pending = [reference]
+        while pending:
+            dependency = pending.pop()
+            if dependency in reachable:
+                continue
+            reachable.add(dependency)
+            pending.extend(edges[dependency])
     return roots
 
 
-def _reachable(
-    roots: Iterable[BomRef],
-    edges: Mapping[BomRef, list[BomRef]],
-) -> set[BomRef]:
-    seen: set[BomRef] = set()
-    pending = list(roots)
-    while pending:
-        reference = pending.pop()
-        if reference in seen:
-            continue
-        seen.add(reference)
-        pending.extend(edges[reference])
-    return seen
-
-
-def _timestamp() -> datetime:
+def _creation_timestamp() -> datetime:
+    """Use SOURCE_DATE_EPOCH when the caller requests reproducible output."""
     epoch = os.environ.get("SOURCE_DATE_EPOCH")
     if epoch is None:
         return datetime.now(timezone.utc)
@@ -350,7 +356,11 @@ def _timestamp() -> datetime:
         ) from error
 
 
-def _hash(algorithm: HashAlgorithm, value: str, package_name: str) -> HashType:
+def _validated_hash(
+    algorithm: HashAlgorithm,
+    value: str,
+    package_name: str,
+) -> HashType:
     expected_length = {
         HashAlgorithm.MD5: 32,
         HashAlgorithm.SHA_256: 64,
@@ -364,36 +374,37 @@ def _hash(algorithm: HashAlgorithm, value: str, package_name: str) -> HashType:
     return HashType(alg=algorithm, content=value.lower())
 
 
-def _channel_name(record: PackageRecord) -> str | None:
-    channel = record.channel
-    name = getattr(channel, "canonical_name", None)
-    if not name and channel:
-        name = str(channel)
+def _safe_channel_name(record: PackageRecord) -> str | None:
+    """Return public channel identity while omitting local channel paths."""
+    name = record.channel_name
     if name in {None, "", "<unknown>", "unknown"}:
         return None
     name = str(name)
-    if urlsplit(name).scheme:
-        return _sanitize_url(name)
+    if name.startswith(("/", "\\", "./", "../", "~/")):
+        return None
+    try:
+        scheme = urlsplit(name).scheme
+    except ValueError:
+        return None
+    if scheme:
+        return _sanitized_remote_url(name)
     return name
 
 
-def _archive_type(filename: str | None) -> str | None:
-    if not filename:
-        return None
-    if filename.endswith(".conda"):
-        return "conda"
-    if filename.endswith(".tar.bz2"):
-        return "tar.bz2"
-    return None
-
-
-def _sanitize_url(url: str) -> str | None:
-    sanitized = remove_auth(split_anaconda_token(url)[0])
-    parts = urlsplit(sanitized)
-    if not parts.scheme or parts.scheme.lower() == "file":
+def _sanitized_remote_url(url: str) -> str | None:
+    """Strip credentials and mutable URL data, and reject local file URLs."""
+    try:
+        parts = urlsplit(url)
+        is_windows_path = (
+            len(parts.scheme) == 1
+            and len(url) > 2
+            and url[1] == ":"
+            and url[2] in {"/", "\\"}
+        )
+        if not parts.scheme or parts.scheme.lower() == "file" or is_windows_path:
+            return None
+        sanitized = remove_auth(split_anaconda_token(url)[0])
+        parts = urlsplit(sanitized)
+    except ValueError:
         return None
     return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
-
-
-def _normalized_name(name: str | None) -> str:
-    return str(name or "").lower()

@@ -29,8 +29,9 @@ def _package(
     license_name: str | None = None,
     url: str | None = None,
     channel: str = "https://conda.anaconda.org/conda-forge",
+    filename: str | None = None,
 ) -> PackageRecord:
-    filename = f"{name}-{version}-{build}.conda"
+    filename = filename or f"{name}-{version}-{build}.conda"
     return PackageRecord(
         name=name,
         version=version,
@@ -46,10 +47,6 @@ def _package(
         size=123,
         url=url or f"https://conda.anaconda.org/conda-forge/linux-64/{filename}",
     )
-
-
-def _document(environment: Environment) -> dict:
-    return json.loads(export_cyclonedx_json(environment))
 
 
 def _component(document: dict, name: str) -> dict:
@@ -182,7 +179,7 @@ def test_inferred_roots_cover_a_disconnected_cycle(
         ],
     )
 
-    document = _document(environment)
+    document = json.loads(export_cyclonedx_json(environment))
     root = document["metadata"]["component"]
     dependencies = _dependencies(document)
 
@@ -221,28 +218,44 @@ def test_export_is_deterministic_for_reordered_records(
     assert export_cyclonedx_json(forward) == export_cyclonedx_json(reverse)
 
 
-def test_local_channel_paths_are_not_serialized(
+def test_local_source_paths_are_not_serialized(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
-    private_path = "/Users/alice/private-channel"
+    posix_path = "/Users/alice/private-channel"
+    windows_path = "C:\\Users\\alice\\private-channel"
+    posix_filename = "private-posix-1.0-h123_0.conda"
+    windows_filename = "private-windows-1.0-h123_0.conda"
     environment = Environment(
         platform="linux-64",
         explicit_packages=[
             _package(
-                "private",
-                channel=f"file://{private_path}",
-                url=f"file://{private_path}/linux-64/private-1.0-h123_0.conda",
-            )
+                "private-posix",
+                channel=f"file://{posix_path}",
+                url=f"file://{posix_path}/linux-64/{posix_filename}",
+                filename=f"{posix_path}/{posix_filename}",
+            ),
+            _package(
+                "private-windows",
+                channel=windows_path,
+                url=f"{windows_path}\\{windows_filename}",
+                filename=f"{windows_path}\\{windows_filename}",
+            ),
         ],
     )
 
     output = export_cyclonedx_json(environment)
-    component = _component(json.loads(output), "private")
+    document = json.loads(output)
 
-    assert private_path not in output
-    assert "channel=" not in component["purl"]
-    assert "externalReferences" not in component
+    assert posix_path not in output
+    assert windows_path not in output
+    for name in ("private-posix", "private-windows"):
+        component = _component(document, name)
+        assert _properties(component)["conda:package:filename"] == (
+            f"{name}-1.0-h123_0.conda"
+        )
+        assert "channel=" not in component["purl"]
+        assert "externalReferences" not in component
 
 
 @pytest.mark.parametrize("epoch", ["tomorrow", "-1"])
