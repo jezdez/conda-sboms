@@ -13,13 +13,19 @@ The project is alpha software. Questions, bug reports, and contributions are
 
 ## Quick start
 
-`conda-sboms` requires conda 26.3 or newer, which is not distributed on PyPI.
-Activate the environment that owns the `conda` executable, then install the
-plugin into that environment:
+`conda-sboms` requires conda 26.3 or newer. conda 26.5 and newer include the
+[`conda-pypi`](https://conda.github.io/conda-pypi/quickstart/) plugin. For a
+standard conda installation, activate `base` and install `conda-sboms` from
+PyPI as a conda package:
 
 ```console
-python -m pip install conda-sboms
+conda activate base
+conda pypi install conda-sboms
 ```
+
+If `conda pypi` is not available, follow the
+[installation guide](https://jezdez.github.io/conda-sboms/how-to/install/) to
+install the wheel with pip.
 
 Generate an SBOM for an installed environment:
 
