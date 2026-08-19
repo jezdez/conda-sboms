@@ -58,18 +58,17 @@
 
 ## Code structure
 
-- Before adding a private module-level helper, check whether conda,
+- Before adding a class or method, check whether conda,
   `cyclonedx-python-lib`, `packageurl-python`, or the standard library already
   provides the operation.
 
-- Keep a private helper only when it owns a stable format mapping, graph
-  operation, validation rule, or privacy boundary. Inline short one-use glue at
-  its call site.
+- Prefer cohesive classes when format mapping, dependency graph construction,
+  and serialization share input or derived state. Reserve module-level
+  functions for framework callbacks, required APIs, or operations with no
+  meaningful object owner.
 
-- Do not introduce a wrapper class solely to turn exporter helpers into
-  methods. This package receives conda and CycloneDX model objects whose classes
-  already own their data. Add an internal class only when it has durable state
-  or behavior that those models cannot own.
+- Do not create stateless utility classes or methods that only wrap one
+  expression. Inline short one-use glue in the class that owns it.
 
 - Do not create a public utility or shared module until a second format needs
   the same behavior. Keep format-specific functions in their format module.
