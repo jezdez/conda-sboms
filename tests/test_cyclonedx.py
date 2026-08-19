@@ -14,8 +14,8 @@ from conda.plugins.types import EnvironmentFormat
 from cyclonedx.schema import SchemaVersion
 from cyclonedx.validation.json import JsonStrictValidator
 
-from conda_sbom.cyclonedx import export_cyclonedx_json
-from conda_sbom.plugin import conda_environment_exporters
+from conda_sboms.cyclonedx import export_cyclonedx_json
+from conda_sboms.plugin import conda_environment_exporters
 
 
 def _package(
@@ -110,7 +110,7 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
     assert document["version"] == 1
     assert "serialNumber" not in document
     assert document["metadata"]["timestamp"] == "1970-01-01T00:00:00+00:00"
-    assert document["metadata"]["tools"]["components"][0]["name"] == "conda-sbom"
+    assert document["metadata"]["tools"]["components"][0]["name"] == "conda-sboms"
 
     python_component = _component(document, "python")
     assert python_component["purl"] == (

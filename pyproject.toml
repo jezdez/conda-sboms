@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
 
 [project]
-name = "conda-sbom"
+name = "conda-sboms"
 description = "Generate software bills of materials from conda environments"
 requires-python = ">=3.10"
 readme = "README.md"
@@ -27,16 +27,16 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-repository = "https://github.com/conda-incubator/conda-sbom"
+repository = "https://github.com/conda-incubator/conda-sboms"
 
 [project.entry-points.conda]
-conda-sbom = "conda_sbom.plugin"
+conda-sboms = "conda_sboms.plugin"
 
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "conda_sbom/_version.py"
+version-file = "conda_sboms/_version.py"
 
 [tool.pytest.ini_options]
 addopts = "-ra -v"
@@ -44,7 +44,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py310"
-exclude = ["conda_sbom/_version.py"]
+exclude = ["conda_sboms/_version.py"]
 
 [tool.ruff.lint]
 flake8-type-checking = { exempt-modules = [], strict = true }
@@ -61,7 +61,7 @@ cyclonedx-python-lib = ">=11.12,<12"
 packageurl-python = ">=0.16"
 
 [tool.pixi.pypi-dependencies]
-conda-sbom = { path = ".", editable = true }
+conda-sboms = { path = ".", editable = true }
 
 [tool.pixi.feature.dev.dependencies]
 ruff = ">=0.9"
@@ -89,9 +89,9 @@ test-py310 = { features = ["dev", "test", "py310"], solve-group = "test-py310" }
 test-py314 = { features = ["dev", "test", "py314"], solve-group = "test-py314" }
 
 [tool.pixi.tasks]
-format = { cmd = "ruff format conda_sbom tests", description = "Format source and tests" }
-format-check = { cmd = "ruff format --check conda_sbom tests", description = "Check formatting" }
-lint = { cmd = "ruff check conda_sbom tests", description = "Check source and tests" }
+format = { cmd = "ruff format conda_sboms tests", description = "Format source and tests" }
+format-check = { cmd = "ruff format --check conda_sboms tests", description = "Check formatting" }
+lint = { cmd = "ruff check conda_sboms tests", description = "Check source and tests" }
 test = { cmd = "pytest", description = "Run tests" }
 
 [tool.pixi.tasks.check]

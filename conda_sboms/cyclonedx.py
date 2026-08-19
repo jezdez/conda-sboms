@@ -106,10 +106,10 @@ def export_cyclonedx_json(environment: Environment) -> str:
 
     tool = Component(
         type=ComponentType.APPLICATION,
-        name="conda-sbom",
+        name="conda-sboms",
         version=__version__,
-        bom_ref=f"tool:conda-sbom@{quote(__version__, safe='')}",
-        purl=PackageURL(type="pypi", name="conda-sbom", version=__version__),
+        bom_ref=f"tool:conda-sboms@{quote(__version__, safe='')}",
+        purl=PackageURL(type="pypi", name="conda-sboms", version=__version__),
     )
     bom = Bom(
         serial_number=_SERIAL_NUMBER_PLACEHOLDER,

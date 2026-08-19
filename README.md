@@ -1,6 +1,6 @@
-# conda-sbom
+# conda-sboms
 
-`conda-sbom` provides software bill of materials exporters for conda.
+`conda-sboms` provides software bill of materials exporters for conda.
 
 The first exporter writes CycloneDX 1.7 JSON from a resolved conda
 environment. Additional formats, such as SPDX JSON, can be added as separate

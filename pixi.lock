@@ -11173,7 +11173,7 @@ packages:
   size: 387535
   timestamp: 1786599623274
 - pypi: ./
-  name: conda-sbom
+  name: conda-sboms
   requires_dist:
   - cyclonedx-python-lib>=11.12,<12
   - packageurl-python>=0.16
