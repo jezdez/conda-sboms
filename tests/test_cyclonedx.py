@@ -94,6 +94,7 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
     )
     environment = Environment(
         name="demo",
+        prefix="/Users/alice/private-prefix",
         platform="linux-64",
         explicit_packages=[python, openssl],
         requested_packages=[MatchSpec("python")],
@@ -138,6 +139,8 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
     )
 
     root = document["metadata"]["component"]
+    assert root["name"] == "demo"
+    assert "/Users/alice/private-prefix" not in output
     root_properties = _properties(root)
     assert root_properties["conda:environment:root-dependency-source"] == (
         "requested-packages"
@@ -224,8 +227,10 @@ def test_local_source_paths_are_not_serialized(
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
     posix_path = "/Users/alice/private-channel"
     windows_path = "C:\\Users\\alice\\private-channel"
+    relative_path = "relative/private-channel"
     posix_filename = "private-posix-1.0-h123_0.conda"
     windows_filename = "private-windows-1.0-h123_0.conda"
+    relative_filename = "private-relative-1.0-h123_0.conda"
     environment = Environment(
         platform="linux-64",
         explicit_packages=[
@@ -241,6 +246,12 @@ def test_local_source_paths_are_not_serialized(
                 url=f"{windows_path}\\{windows_filename}",
                 filename=f"{windows_path}\\{windows_filename}",
             ),
+            _package(
+                "private-relative",
+                channel=relative_path,
+                url=f"{relative_path}/{relative_filename}",
+                filename=f"{relative_path}/{relative_filename}",
+            ),
         ],
     )
 
@@ -249,13 +260,42 @@ def test_local_source_paths_are_not_serialized(
 
     assert posix_path not in output
     assert windows_path not in output
-    for name in ("private-posix", "private-windows"):
+    assert relative_path not in output
+    for name in ("private-posix", "private-windows", "private-relative"):
         component = _component(document, name)
         assert _properties(component)["conda:package:filename"] == (
             f"{name}-1.0-h123_0.conda"
         )
         assert "channel=" not in component["purl"]
         assert "externalReferences" not in component
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "/Users/alice/private-environment",
+        "C:\\Users\\alice\\private-environment",
+        "../private-environment",
+    ],
+)
+def test_local_environment_names_are_not_serialized(
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    environment = Environment(
+        name=name,
+        prefix=name,
+        platform="linux-64",
+        explicit_packages=[_package("example")],
+    )
+
+    output = export_cyclonedx_json(environment)
+    root = json.loads(output)["metadata"]["component"]
+
+    assert "private-environment" not in output
+    assert root["name"] == "conda-environment"
+    assert root["bom-ref"] == "conda-environment:conda-environment?platform=linux-64"
 
 
 @pytest.mark.parametrize("epoch", ["tomorrow", "-1"])
@@ -298,8 +338,8 @@ def test_plugin_registration() -> None:
     exporters = list(conda_environment_exporters())
 
     assert len(exporters) == 1
-    assert exporters[0].name == "cyclonedx-json"
-    assert exporters[0].aliases == ("cyclonedx", "cdx-json")
+    assert exporters[0].name == "cyclonedx-json-v1.7"
+    assert exporters[0].aliases == ("cyclonedx-json", "cyclonedx", "cdx-json")
     assert exporters[0].environment_format is EnvironmentFormat.environment
 
 

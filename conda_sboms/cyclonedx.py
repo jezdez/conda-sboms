@@ -40,8 +40,8 @@ if TYPE_CHECKING:
 # cyclonedx-python-lib requires a UUID even though the serialized field is removed.
 _SERIAL_NUMBER_PLACEHOLDER = UUID("00000000-0000-4000-8000-000000000000")
 
-FORMAT: Final = "cyclonedx-json"
-ALIASES: Final = ("cyclonedx", "cdx-json")
+FORMAT: Final = "cyclonedx-json-v1.7"
+ALIASES: Final = ("cyclonedx-json", "cyclonedx", "cdx-json")
 DEFAULT_FILENAMES: Final = ("*.cdx.json",)
 DESCRIPTION: Final = "CycloneDX 1.7 JSON software bill of materials"
 
@@ -213,7 +213,9 @@ def _root_component(
     root_source: str,
 ) -> Component:
     """Describe the exported environment without exposing its local prefix."""
-    name = environment.name or "conda-environment"
+    name = str(environment.name or "")
+    if not name or "/" in name or "\\" in name:
+        name = "conda-environment"
     properties = [
         Property(name="conda:environment:platform", value=environment.platform),
         Property(name="conda:environment:scope", value="resolved-conda-packages"),
@@ -380,14 +382,14 @@ def _safe_channel_name(record: PackageRecord) -> str | None:
     if name in {None, "", "<unknown>", "unknown"}:
         return None
     name = str(name)
-    if name.startswith(("/", "\\", "./", "../", "~/")):
-        return None
     try:
         scheme = urlsplit(name).scheme
     except ValueError:
         return None
     if scheme:
         return _sanitized_remote_url(name)
+    if "/" in name or "\\" in name or name in {".", "..", "~"}:
+        return None
     return name
 
 

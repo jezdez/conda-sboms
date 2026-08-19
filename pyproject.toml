@@ -27,7 +27,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-repository = "https://github.com/conda-incubator/conda-sboms"
+documentation = "https://jezdez.github.io/conda-sboms/"
+repository = "https://github.com/jezdez/conda-sboms"
 
 [project.entry-points.conda]
 conda-sboms = "conda_sboms.plugin"
@@ -72,6 +73,15 @@ rattler-build = ">=0.74"
 [tool.pixi.feature.build.tasks]
 build = "rattler-build build --recipe recipe/recipe.yaml"
 
+[tool.pixi.feature.docs.dependencies]
+conda-sphinx-theme = ">=0.2"
+myst-parser = ">=3.0"
+sphinx = ">=7.0"
+sphinx-design = ">=0.6"
+
+[tool.pixi.feature.docs.tasks]
+docs = { cmd = "sphinx-build -b dirhtml docs docs/_build/dirhtml", description = "Build documentation" }
+
 [tool.pixi.feature.test.dependencies]
 jsonschema = ">=4.0"
 pytest = ">=8.0"
@@ -85,6 +95,7 @@ python = "3.14.*"
 [tool.pixi.environments]
 dev = { features = ["dev", "test"], solve-group = "default" }
 build = { features = ["build"], solve-group = "default" }
+docs = { features = ["docs"], no-default-feature = true }
 test-py310 = { features = ["dev", "test", "py310"], solve-group = "test-py310" }
 test-py314 = { features = ["dev", "test", "py314"], solve-group = "test-py314" }
 
