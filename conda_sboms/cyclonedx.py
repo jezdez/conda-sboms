@@ -21,12 +21,14 @@ from cyclonedx.model import (
 )
 from cyclonedx.model.bom import Bom, BomMetaData
 from cyclonedx.model.component import Component, ComponentType
+from cyclonedx.model.contact import OrganizationalContact, OrganizationalEntity
 from cyclonedx.model.license import DisjunctiveLicense
 from cyclonedx.model.tool import ToolRepository
 from cyclonedx.output.json import JsonV1Dot7
 from packageurl import PackageURL
 
 from . import __version__
+from .settings import CycloneDXExportMetadata
 
 if TYPE_CHECKING:
     from typing import Final
@@ -240,7 +242,11 @@ class _CycloneDXDependencyGraph:
 class _CycloneDXExporter:
     """Build a CycloneDX 1.7 document from a resolved conda environment."""
 
-    def __init__(self, environment: Environment) -> None:
+    def __init__(
+        self,
+        environment: Environment,
+        metadata: CycloneDXExportMetadata,
+    ) -> None:
         if not environment.explicit_packages:
             raise CondaValueError(
                 "CycloneDX export requires exact package records. Export an installed "
@@ -266,8 +272,9 @@ class _CycloneDXExporter:
             "incomplete" if any(environment.external_packages.values()) else "unknown"
         )
 
-        name = str(environment.name or "")
-        if not name or "/" in name or "\\" in name:
+        self.metadata = metadata
+        name = metadata.product_name or str(environment.name or "")
+        if not metadata.product_name and (not name or "/" in name or "\\" in name):
             name = "conda-environment"
         root_source = (
             "inferred-graph-roots" if self.roots_inferred else "requested-packages"
@@ -304,12 +311,28 @@ class _CycloneDXExporter:
                     value=str(self.graph.missing_edge_count),
                 )
             )
+        identity = quote(name, safe="")
+        if metadata.product_version:
+            identity += f"@{quote(metadata.product_version, safe='')}"
         self.root = Component(
             type=ComponentType.APPLICATION,
             name=name,
+            version=metadata.product_version,
             bom_ref=(
-                f"conda-environment:{quote(name, safe='')}"
+                f"conda-environment:{identity}"
                 f"?platform={quote(environment.platform, safe='')}"
+            ),
+            manufacturer=(
+                OrganizationalEntity(
+                    name=metadata.product_manufacturer,
+                    urls=(
+                        [XsUri(metadata.product_manufacturer_url)]
+                        if metadata.product_manufacturer_url
+                        else None
+                    ),
+                )
+                if metadata.product_manufacturer
+                else None
             ),
             properties=properties,
         )
@@ -344,6 +367,28 @@ class _CycloneDXExporter:
                 timestamp=self.timestamp,
                 tools=ToolRepository(components=[tool]),
                 component=self.root,
+                manufacturer=(
+                    OrganizationalEntity(
+                        name=self.metadata.author_organization,
+                        urls=(
+                            [XsUri(self.metadata.author_organization_url)]
+                            if self.metadata.author_organization_url
+                            else None
+                        ),
+                    )
+                    if self.metadata.author_organization
+                    else None
+                ),
+                authors=(
+                    [
+                        OrganizationalContact(
+                            name=self.metadata.author_name,
+                            email=self.metadata.author_email,
+                        )
+                    ]
+                    if self.metadata.author_name
+                    else None
+                ),
             ),
             components=components,
         )
@@ -387,6 +432,13 @@ class _CycloneDXExporter:
         return json.dumps(document, indent=2, sort_keys=True) + "\n"
 
 
-def export_cyclonedx_json(environment: Environment) -> str:
+def export_cyclonedx_json(
+    environment: Environment,
+    *,
+    metadata: CycloneDXExportMetadata | None = None,
+) -> str:
     """Export a resolved conda environment as CycloneDX 1.7 JSON."""
-    return _CycloneDXExporter(environment).export()
+    return _CycloneDXExporter(
+        environment,
+        metadata if metadata is not None else CycloneDXExportMetadata.from_context(),
+    ).export()
