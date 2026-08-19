@@ -93,7 +93,7 @@ Each exact conda package record becomes a `library` component.
 | `hashes` | Available SHA-256 and MD5 archive hashes |
 | `licenses` | Raw conda license text represented as a named license |
 | `externalReferences` | Sanitized remote package URL with type `distribution` |
-| `properties` | Build string, build number, subdir, safe channel, filename, and archive size when available |
+| `properties` | Build string, build number, subdir, canonical channel, filename, and archive size when available |
 
 License text is not treated as an SPDX expression because legacy conda records
 may contain arbitrary text. A channel is not treated as the package supplier,
@@ -130,9 +130,10 @@ a declared dependency absent from the resolved record set appears in a separate
 ## Privacy behavior
 
 The exporter removes basic authentication, Anaconda token path segments, query
-strings, and fragments from remote distribution URLs. It omits local file URLs,
-scheme-less channel values containing path separators, and local environment
-paths. Package filenames are reduced to their basename before serialization.
+strings, and fragments from remote distribution URLs. Channel identity comes
+from conda's canonical channel name. Local file URLs, local file channels, and
+local environment paths are omitted. Package filenames are reduced to their
+basename before serialization.
 
 ## Errors
 

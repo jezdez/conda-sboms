@@ -21,7 +21,6 @@ from cyclonedx.model import (
 )
 from cyclonedx.model.bom import Bom, BomMetaData
 from cyclonedx.model.component import Component, ComponentType
-from cyclonedx.model.dependency import Dependency
 from cyclonedx.model.license import DisjunctiveLicense
 from cyclonedx.model.tool import ToolRepository
 from cyclonedx.output.json import JsonV1Dot7
@@ -78,30 +77,7 @@ def export_cyclonedx_json(environment: Environment) -> str:
     )
 
     root = _root_component(
-        environment,
-        missing_dependency_edges=missing_dependency_edges,
-        root_source=(
-            "requested-packages"
-            if environment.requested_packages
-            else "inferred-graph-roots"
-        ),
-    )
-    dependencies = [
-        Dependency(
-            ref=component.bom_ref,
-            dependencies=[
-                Dependency(ref=dependency) for dependency in edges[component.bom_ref]
-            ],
-        )
-        for component in components
-    ]
-    dependencies.append(
-        Dependency(
-            ref=root.bom_ref,
-            dependencies=[
-                Dependency(ref=dependency) for dependency in root_dependencies
-            ],
-        )
+        environment, missing_dependency_edges=missing_dependency_edges
     )
 
     tool = Component(
@@ -119,7 +95,16 @@ def export_cyclonedx_json(environment: Environment) -> str:
             component=root,
         ),
         components=components,
-        dependencies=dependencies,
+    )
+    components_by_ref = {component.bom_ref: component for component in components}
+    for component in components:
+        bom.register_dependency(
+            component,
+            [components_by_ref[ref] for ref in edges[component.bom_ref]],
+        )
+    bom.register_dependency(
+        root,
+        [components_by_ref[ref] for ref in root_dependencies],
     )
 
     document = json.loads(JsonV1Dot7(bom).output_as_string())
@@ -149,15 +134,18 @@ def export_cyclonedx_json(environment: Environment) -> str:
 
 def _package_component(record: PackageRecord) -> Component:
     """Map one exact conda package record to a CycloneDX component."""
-    raw_filename = getattr(record, "fn", None)
+    raw_filename = record.fn
     filename = None
     if raw_filename:
         filename = str(raw_filename).replace("\\", "/").rsplit("/", 1)[-1]
         filename = filename.split("?", 1)[0].split("#", 1)[0] or None
-    purl = _conda_purl(record, filename)
+    channel_name = record.channel_name
+    if record.channel.scheme == "file" or channel_name in {None, "", "<unknown>"}:
+        channel_name = None
+    purl = _conda_purl(record, filename, channel_name)
     hashes = []
-    sha256 = getattr(record, "sha256", None)
-    md5 = getattr(record, "md5", None)
+    sha256 = record.sha256
+    md5 = record.md5
     if sha256:
         hashes.append(_validated_hash(HashAlgorithm.SHA_256, sha256, record.name))
     if md5:
@@ -168,9 +156,8 @@ def _package_component(record: PackageRecord) -> Component:
         Property(name="conda:package:build-number", value=str(record.build_number)),
         Property(name="conda:package:subdir", value=record.subdir),
     ]
-    channel = _safe_channel_name(record)
-    if channel:
-        properties.append(Property(name="conda:package:channel", value=channel))
+    if channel_name:
+        properties.append(Property(name="conda:package:channel", value=channel_name))
     size = getattr(record, "size", None)
     if filename:
         properties.append(Property(name="conda:package:filename", value=filename))
@@ -178,7 +165,7 @@ def _package_component(record: PackageRecord) -> Component:
         properties.append(Property(name="conda:package:size", value=str(size)))
 
     external_references = []
-    url = getattr(record, "url", None)
+    url = record.url
     sanitized_url = _sanitized_remote_url(str(url)) if url else None
     if sanitized_url:
         external_references.append(
@@ -189,7 +176,7 @@ def _package_component(record: PackageRecord) -> Component:
         )
 
     licenses = []
-    license_name = getattr(record, "license", None)
+    license_name = record.license
     if license_name:
         licenses.append(DisjunctiveLicense(name=license_name))
 
@@ -210,12 +197,16 @@ def _root_component(
     environment: Environment,
     *,
     missing_dependency_edges: int,
-    root_source: str,
 ) -> Component:
     """Describe the exported environment without exposing its local prefix."""
     name = str(environment.name or "")
     if not name or "/" in name or "\\" in name:
         name = "conda-environment"
+    root_source = (
+        "requested-packages"
+        if environment.requested_packages
+        else "inferred-graph-roots"
+    )
     properties = [
         Property(name="conda:environment:platform", value=environment.platform),
         Property(name="conda:environment:scope", value="resolved-conda-packages"),
@@ -256,15 +247,18 @@ def _root_component(
     )
 
 
-def _conda_purl(record: PackageRecord, filename: str | None) -> PackageURL:
+def _conda_purl(
+    record: PackageRecord,
+    filename: str | None,
+    channel_name: str | None,
+) -> PackageURL:
     """Build the current package-url conda identity in one changeable seam."""
     qualifiers = {
         "build": record.build,
         "subdir": record.subdir,
     }
-    channel = _safe_channel_name(record)
-    if channel:
-        qualifiers["channel"] = channel
+    if channel_name:
+        qualifiers["channel"] = channel_name
     if filename and filename.endswith(".conda"):
         qualifiers["type"] = "conda"
     elif filename and filename.endswith(".tar.bz2"):
@@ -302,7 +296,7 @@ def _package_dependency_graph(
 
 
 def _root_dependency_refs(
-    requested_packages: Iterable[MatchSpec],
+    requested_packages: list[MatchSpec],
     edges: Mapping[BomRef, list[BomRef]],
     refs_by_name: Mapping[str, BomRef],
 ) -> list[BomRef]:
@@ -374,23 +368,6 @@ def _validated_hash(
             f"Invalid {algorithm.value} hash for conda package {package_name}"
         )
     return HashType(alg=algorithm, content=value.lower())
-
-
-def _safe_channel_name(record: PackageRecord) -> str | None:
-    """Return public channel identity while omitting local channel paths."""
-    name = record.channel_name
-    if name in {None, "", "<unknown>", "unknown"}:
-        return None
-    name = str(name)
-    try:
-        scheme = urlsplit(name).scheme
-    except ValueError:
-        return None
-    if scheme:
-        return _sanitized_remote_url(name)
-    if "/" in name or "\\" in name or name in {".", "..", "~"}:
-        return None
-    return name
 
 
 def _sanitized_remote_url(url: str) -> str | None:
