@@ -5,27 +5,20 @@ graph as CycloneDX 1.7 JSON, and inspects the result.
 
 ## Prerequisites
 
-- Git
-- [Pixi](https://pixi.prefix.dev/)
+- conda 26.3 or newer
+- pip in the environment that owns the `conda` executable
 - network access to conda-forge
 
-`conda-sboms` has no published release yet, so this tutorial runs it from the
-repository's locked development environment.
-
-## Run conda-sboms from source
-
-Clone the repository and install the development environment:
+## Install conda-sboms
 
 ```console
-git clone https://github.com/jezdez/conda-sboms.git
-cd conda-sboms
-pixi install --locked -e dev
+python -m pip install conda-sboms
 ```
 
 Confirm that conda discovered the exporter:
 
 ```console
-pixi run --locked -e dev conda export --help
+conda export --help
 ```
 
 The available environment formats should include `cyclonedx-json-v1.7` with the
@@ -36,7 +29,7 @@ aliases `cyclonedx-json`, `cyclonedx`, and `cdx-json`.
 Create a local prefix with Python and Requests:
 
 ```console
-pixi run --locked -e dev conda create \
+conda create \
   --prefix ./build/tutorial-environment \
   --channel conda-forge \
   --yes \
@@ -49,7 +42,7 @@ package set. The exporter uses both parts of that record.
 ## Export the SBOM
 
 ```console
-pixi run --locked -e dev conda export \
+conda export \
   --prefix ./build/tutorial-environment \
   --from-history \
   --format cyclonedx-json \
@@ -64,7 +57,7 @@ roots. The exporter still writes every resolved conda package as a component.
 Print the format, root component, root source, and component count:
 
 ```console
-pixi run --locked -e dev python - <<'PY'
+python - <<'PY'
 import json
 from pathlib import Path
 
@@ -94,7 +87,7 @@ The corresponding entry in `dependencies` points to its resolved dependencies.
 Remove the tutorial environment and generated SBOM:
 
 ```console
-pixi run --locked -e dev conda remove \
+conda remove \
   --prefix ./build/tutorial-environment \
   --all \
   --yes
