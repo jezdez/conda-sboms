@@ -5,14 +5,14 @@ graph as CycloneDX 1.7 JSON, and inspects the result.
 
 ## Prerequisites
 
-- conda 26.3 or newer
-- pip in the environment that owns the `conda` executable
-- network access to conda-forge
+- conda 26.5 or newer
+- network access to PyPI and your configured conda channels
 
 ## Install conda-sboms
 
 ```console
-python -m pip install conda-sboms
+conda activate base
+conda pypi install conda-sboms
 ```
 
 Confirm that conda discovered the exporter:

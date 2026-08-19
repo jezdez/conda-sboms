@@ -5,11 +5,16 @@
 plugin installed in an unrelated named environment is not available to the
 other `conda` executable.
 
-conda 26.3 or newer is required and is not distributed on PyPI. Activate the
-environment that already provides conda, then install the plugin:
+conda 26.3 or newer is required. conda 26.5 and newer include the
+[`conda-pypi` plugin](https://conda.github.io/conda-pypi/quickstart/), which can
+download the published wheel from PyPI, convert it to a conda package, and
+install it into the environment that owns conda.
+
+For a standard conda installation, activate `base` and install the plugin:
 
 ```console
-python -m pip install conda-sboms
+conda activate base
+conda pypi install conda-sboms
 ```
 
 Confirm that the same conda installation discovers the exporter:
@@ -22,6 +27,15 @@ The help output should list:
 
 ```text
 - cyclonedx-json-v1.7 (aliases: cyclonedx-json, cyclonedx, cdx-json): *.cdx.json
+```
+
+## Install with pip
+
+If `conda pypi` is not available, activate the environment that owns the
+`conda` executable and install the same wheel directly:
+
+```console
+python -m pip install conda-sboms
 ```
 
 ## Run from a source checkout
