@@ -1,54 +1,64 @@
 # conda-sboms
 
-`conda-sboms` provides software bill of materials exporters for conda.
+`conda-sboms` adds CycloneDX software bill of materials (SBOM) export to
+`conda export`. It currently emits CycloneDX 1.7 JSON for a resolved conda
+environment.
 
-The first exporter writes CycloneDX 1.7 JSON from a resolved conda
-environment. Additional formats, such as SPDX JSON, can be added as separate
-exporters without changing conda or conda-workspaces.
+The project is alpha software. No package release has been published yet. The
+[installation guide](https://jezdez.github.io/conda-sboms/how-to/install/)
+explains how to run it from source without changing a normal conda
+installation.
 
-## Development
+## Use
 
-Install the development environment and list the registered exporter:
-
-```console
-pixi install
-pixi run conda export --help
-```
-
-Generate a CycloneDX SBOM from an installed environment:
+After the plugin is installed in the environment that owns `conda`, export an
+installed environment by name:
 
 ```console
 conda export --name my-environment --from-history \
-  --format cyclonedx-json --file my-environment.cdx.json
+  --format cyclonedx-json \
+  --file my-environment.cdx.json
 ```
 
-The exporter also works with clients of conda's exporter plugin hook. For
-example, conda-workspaces can call it for a selected environment and platform:
+`--from-history` asks conda to preserve the requested package roots when its
+history contains them. The SBOM still contains every resolved conda package.
+
+## What it records
+
+The exporter represents the environment as the root application and each exact
+conda package record as a library component. It includes available package
+hashes, build and platform data, license text, sanitized distribution URLs,
+conda package URLs, and dependency edges.
+
+## Limitations
+
+The exporter does not inspect package contents, discover vendored or statically
+linked software, include packages from other ecosystems, identify a
+manufacturer, scan for vulnerabilities, or establish Cyber Resilience Act
+conformity. The root composition marks overall coverage as unproven.
+Conda-specific properties record known external-package, virtual-package, and
+missing-dependency counts supplied by the input.
+
+Read the [documentation](https://jezdez.github.io/conda-sboms/) for the format
+reference, conda-workspaces integration, reproducible output, and coverage
+limits.
+
+## Development
+
+Install the locked development environment and confirm that conda discovers the
+exporter:
 
 ```console
-conda workspace export --environment default --from-lockfile \
-  --platform linux-64 --format cyclonedx-json \
-  --file default-linux-64.cdx.json
+pixi install --locked -e dev
+pixi run --locked -e dev conda export --help
 ```
 
-Use `--from-history` when exporting an installed environment so conda can
-preserve the requested top-level packages. A resolved workspace lock provides
-exact package records, but its current exporter model does not preserve the
-manifest's authoritative top-level requirements.
+Run the checks and documentation build:
 
-## Scope
-
-The CycloneDX exporter inventories exact conda package records and their
-dependency graph. It reports unknown assembly completeness because conda
-records do not establish coverage of all vendored or statically linked
-software, virtual and system dependencies, or manufacturer metadata. Known
-omitted external packages and partial dependency sets are marked incomplete.
-The output can contribute to product technical documentation, but it is not by
-itself a claim of Cyber Resilience Act conformity.
-
-No accepted conda Enhancement Proposal currently defines an SBOM format or CRA
-profile. The initial exporter follows CycloneDX 1.7 and the published conda
-package-url type.
+```console
+pixi run --locked -e dev check
+pixi run --locked -e docs docs
+```
 
 ## License
 

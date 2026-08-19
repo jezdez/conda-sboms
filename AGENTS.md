@@ -179,9 +179,22 @@
 
 ## Documentation
 
+- Build the documentation with Sphinx and MyST Markdown. Organize it by
+  Diátaxis: tutorials teach, how-to guides solve a specific task, reference
+  pages state the exact contract, and explanation pages describe design and
+  boundaries.
+
+- Keep installation instructions consistent with the current release state.
+  Do not publish a `conda install` or `pip install` command before that package
+  exists.
+
 - Document each format by its exact specification version and exporter name.
   Distinguish schema validity, conda environment coverage, draft standards, and
   legal conformity.
+
+- Give a schema-versioned format a version-pinned canonical exporter name. Keep
+  an unversioned alias for interactive use and state that it can advance to a
+  later supported schema.
 
 - Explain that `--from-history` preserves requested roots for installed conda
   environments. Explain current conda-workspaces lock export limitations
