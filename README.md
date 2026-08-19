@@ -4,10 +4,20 @@
 `conda export`. It currently emits CycloneDX 1.7 JSON for a resolved conda
 environment.
 
-The project is alpha software. No package release has been published yet. The
-[installation guide](https://jezdez.github.io/conda-sboms/how-to/install/)
-explains how to run it from source without changing a normal conda
-installation.
+The project is alpha software.
+
+## Install
+
+`conda-sboms` requires conda 26.3 or newer, which is not distributed on PyPI.
+Activate the environment that owns the `conda` executable, then install the
+plugin into that environment:
+
+```console
+python -m pip install conda-sboms
+```
+
+See the [installation guide](https://jezdez.github.io/conda-sboms/how-to/install/)
+for details and source checkout instructions.
 
 ## Use
 
