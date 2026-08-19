@@ -51,3 +51,20 @@ jobs:
           environments: build
       - name: Build package
         run: pixi run --environment build build
+
+  pypi:
+    name: Build PyPI distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          environments: release
+          pixi-version: v0.76.2
+      - name: Build and check distributions
+        run: |
+          pixi run --locked --environment release build-pypi
+          pixi run --locked --environment release check-pypi

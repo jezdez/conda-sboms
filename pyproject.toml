@@ -92,10 +92,22 @@ python = "3.10.*"
 [tool.pixi.feature.py314.dependencies]
 python = "3.14.*"
 
+[tool.pixi.feature.release.dependencies]
+hatch-vcs = ">=0.4"
+hatchling = ">=1.27"
+python = "3.13.*"
+python-build = ">=1.2"
+twine = ">=6.2"
+
+[tool.pixi.feature.release.tasks]
+build-pypi = { cmd = "python -m build --no-isolation", description = "Build the PyPI distributions" }
+check-pypi = { cmd = "python -m twine check --strict dist/*", description = "Check the PyPI distributions" }
+
 [tool.pixi.environments]
 dev = { features = ["dev", "test"], solve-group = "default" }
 build = { features = ["build"], solve-group = "default" }
 docs = { features = ["docs"], no-default-feature = true }
+release = { features = ["release"], no-default-feature = true, platforms = ["linux-64"] }
 test-py310 = { features = ["dev", "test", "py310"], solve-group = "test-py310" }
 test-py314 = { features = ["dev", "test", "py314"], solve-group = "test-py314" }
 
