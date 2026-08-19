@@ -20,9 +20,9 @@ The output identifies each resolved conda package, its available hashes and
 source metadata, and the dependency relationships recorded by conda. It does
 not inspect package contents or claim complete product coverage.
 
-## Choose a documentation path
+## Where to start
 
-::::{grid} 2
+::::{grid} 1 2 2 2
 :gutter: 3
 
 :::{grid-item-card} {octicon}`rocket` Tutorial
@@ -36,7 +36,8 @@ Generate and inspect a CycloneDX SBOM from a small conda environment.
 :link: how-to/install
 :link-type: doc
 
-Run from source, export workspaces, and make output reproducible.
+Install the plugin into the environment that owns `conda`, including from
+source.
 :::
 
 :::{grid-item-card} {octicon}`list-unordered` Reference

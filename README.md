@@ -1,12 +1,17 @@
 # conda-sboms
 
-`conda-sboms` adds CycloneDX software bill of materials (SBOM) export to
-`conda export`. It currently emits CycloneDX 1.7 JSON for a resolved conda
+Generate a CycloneDX software bill of materials (SBOM) for an existing conda
 environment.
 
-The project is alpha software.
+`conda-sboms` is an exporter plugin for `conda`. It adds the `cyclonedx-json`
+format to `conda export` and writes conda's exact package records and dependency
+graph as CycloneDX 1.7 JSON. Because it uses conda's standard exporter hook,
+clients such as conda-workspaces can use the same format.
 
-## Install
+The project is alpha software. Questions, bug reports, and contributions are
+[welcome on GitHub](https://github.com/jezdez/conda-sboms).
+
+## Quick start
 
 `conda-sboms` requires conda 26.3 or newer, which is not distributed on PyPI.
 Activate the environment that owns the `conda` executable, then install the
@@ -16,13 +21,7 @@ plugin into that environment:
 python -m pip install conda-sboms
 ```
 
-See the [installation guide](https://jezdez.github.io/conda-sboms/how-to/install/)
-for details and source checkout instructions.
-
-## Use
-
-After the plugin is installed in the environment that owns `conda`, export an
-installed environment by name:
+Generate an SBOM for an installed environment:
 
 ```console
 conda export --name my-environment --from-history \
@@ -33,14 +32,19 @@ conda export --name my-environment --from-history \
 `--from-history` asks conda to preserve the requested package roots when its
 history contains them. The SBOM still contains every resolved conda package.
 
-## What it records
+For a disposable example, follow the
+[getting-started tutorial](https://jezdez.github.io/conda-sboms/tutorials/getting-started/).
+The [installation guide](https://jezdez.github.io/conda-sboms/how-to/install/)
+also covers source checkouts.
 
-The exporter represents the environment as the root application and each exact
-conda package record as a library component. It includes available package
+## What the SBOM contains
+
+The environment is represented as the root application and each resolved conda
+package as a library component. When available, the SBOM includes package
 hashes, build and platform data, license text, sanitized distribution URLs,
-conda package URLs, and dependency edges.
+conda package URLs, and dependency relationships.
 
-## Limitations
+## Scope and limitations
 
 The exporter does not inspect package contents, discover vendored or statically
 linked software, include packages from other ecosystems, identify a
