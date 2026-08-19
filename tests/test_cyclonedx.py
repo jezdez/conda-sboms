@@ -78,9 +78,10 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
         sha256="A" * 64,
         md5="b" * 32,
         license_name="PSF license and custom terms",
+        channel="conda-forge/label/dev",
         url=(
             "https://user:password@conda.anaconda.org/t/secret/conda-forge/"
-            "linux-64/python-3.13.7-h123_0.conda?token=also-secret"
+            "label/dev/linux-64/python-3.13.7-h123_0.conda?token=also-secret"
         ),
     )
     virtual = PackageRecord(
@@ -115,7 +116,7 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
 
     python_component = _component(document, "python")
     assert python_component["purl"] == (
-        "pkg:conda/python@3.13.7?build=h123_0&channel=conda-forge"
+        "pkg:conda/python@3.13.7?build=h123_0&channel=conda-forge/label/dev"
         "&subdir=linux-64&type=conda"
     )
     assert python_component["hashes"] == [
@@ -129,14 +130,14 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
         {
             "type": "distribution",
             "url": (
-                "https://conda.anaconda.org/conda-forge/linux-64/"
+                "https://conda.anaconda.org/conda-forge/label/dev/linux-64/"
                 "python-3.13.7-h123_0.conda"
             ),
         }
     ]
-    assert _properties(python_component)["conda:package:filename"] == (
-        "python-3.13.7-h123_0.conda"
-    )
+    python_properties = _properties(python_component)
+    assert python_properties["conda:package:channel"] == "conda-forge/label/dev"
+    assert python_properties["conda:package:filename"] == "python-3.13.7-h123_0.conda"
 
     root = document["metadata"]["component"]
     assert root["name"] == "demo"
@@ -227,7 +228,7 @@ def test_local_source_paths_are_not_serialized(
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
     posix_path = "/Users/alice/private-channel"
     windows_path = "C:\\Users\\alice\\private-channel"
-    relative_path = "relative/private-channel"
+    relative_path = "./relative/private-channel"
     posix_filename = "private-posix-1.0-h123_0.conda"
     windows_filename = "private-windows-1.0-h123_0.conda"
     relative_filename = "private-relative-1.0-h123_0.conda"
