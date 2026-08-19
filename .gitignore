@@ -1,0 +1,10 @@
+.coverage
+.pixi/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+build/
+conda_sbom/_version.py
+dist/
+output/
+*.egg-info/
