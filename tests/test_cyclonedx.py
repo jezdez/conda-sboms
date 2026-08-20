@@ -14,12 +14,17 @@ from conda.plugins.types import EnvironmentFormat
 from cyclonedx.schema import SchemaVersion
 from cyclonedx.validation.json import JsonStrictValidator
 
-from conda_sboms.cyclonedx import export_cyclonedx_json
+from conda_sboms.cyclonedx import (
+    CycloneDXDependencyGraph,
+    CycloneDXExporter,
+    CycloneDXPackage,
+    export_cyclonedx_json,
+)
 from conda_sboms.plugin import conda_environment_exporters
 from conda_sboms.settings import CycloneDXExportMetadata
 
 
-def _package(
+def package_record(
     name: str,
     *,
     version: str = "1.0",
@@ -50,29 +55,62 @@ def _package(
     )
 
 
-def _component(document: dict, name: str) -> dict:
+def component_named(document: dict, name: str) -> dict:
     return next(
         component for component in document["components"] if component["name"] == name
     )
 
 
-def _properties(component: dict) -> dict[str, str]:
+def component_properties(component: dict) -> dict[str, str]:
     return {
         property_["name"]: property_["value"] for property_ in component["properties"]
     }
 
 
-def _dependencies(document: dict) -> dict[str, list[str]]:
+def dependency_map(document: dict) -> dict[str, list[str]]:
     return {
         dependency["ref"]: dependency["dependsOn"]
         for dependency in document["dependencies"]
     }
 
 
+def test_public_object_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    record = package_record("example")
+    package = CycloneDXPackage(record)
+    graph = CycloneDXDependencyGraph([package])
+    environment = Environment(
+        name="demo",
+        platform="linux-64",
+        explicit_packages=[record],
+        requested_packages=[MatchSpec("example")],
+    )
+    metadata = CycloneDXExportMetadata()
+    reference = package.component.bom_ref
+    exporter = CycloneDXExporter(environment, metadata=metadata)
+
+    assert package.record is record
+    assert graph.references_by_name == {record.name.lower(): reference}
+    assert graph.components_by_reference == {reference: package.component}
+    assert graph.edges == {reference: []}
+    assert graph.missing_edge_count == 0
+    assert graph.incomplete_references == set()
+    assert graph.root_references(environment.requested_packages) == [reference]
+    assert exporter.packages[0].record is record
+    assert exporter.graph.edges == {reference: []}
+    assert exporter.metadata is metadata
+    assert exporter.root_references == [reference]
+    assert exporter.roots_inferred is False
+    assert exporter.root_completeness == "unknown"
+    assert exporter.root.name == "demo"
+    assert exporter.timestamp.isoformat() == "1970-01-01T00:00:00+00:00"
+    assert exporter.export() == (export_cyclonedx_json(environment, metadata=metadata))
+
+
 def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
-    openssl = _package("openssl", sha256="c" * 64)
-    python = _package(
+    openssl = package_record("openssl", sha256="c" * 64)
+    python = package_record(
         "python",
         version="3.13.7",
         depends=("openssl >=3", "__linux >=6"),
@@ -117,7 +155,7 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
     assert "authors" not in document["metadata"]
     assert "manufacturer" not in document["metadata"]
 
-    python_component = _component(document, "python")
+    python_component = component_named(document, "python")
     assert python_component["purl"] == (
         "pkg:conda/python@3.13.7?build=h123_0&channel=conda-forge/label/dev"
         "&subdir=linux-64&type=conda"
@@ -138,7 +176,7 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
             ),
         }
     ]
-    python_properties = _properties(python_component)
+    python_properties = component_properties(python_component)
     assert python_properties["conda:package:channel"] == "conda-forge/label/dev"
     assert python_properties["conda:package:filename"] == "python-3.13.7-h123_0.conda"
 
@@ -147,7 +185,7 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
     assert "version" not in root
     assert "manufacturer" not in root
     assert "/Users/alice/private-prefix" not in output
-    root_properties = _properties(root)
+    root_properties = component_properties(root)
     assert root_properties["conda:environment:root-dependency-source"] == (
         "requested-packages"
     )
@@ -155,12 +193,12 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
     assert root_properties["conda:environment:virtual-packages-omitted"] == "1"
     assert root_properties["conda:environment:dependency-edges-omitted"] == "1"
 
-    dependencies = _dependencies(document)
+    dependencies = dependency_map(document)
     assert dependencies[root["bom-ref"]] == [python_component["bom-ref"]]
     assert dependencies[python_component["bom-ref"]] == [
-        _component(document, "openssl")["bom-ref"]
+        component_named(document, "openssl")["bom-ref"]
     ]
-    assert dependencies[_component(document, "openssl")["bom-ref"]] == []
+    assert dependencies[component_named(document, "openssl")["bom-ref"]] == []
     assert document["compositions"] == [
         {
             "aggregate": "incomplete",
@@ -181,10 +219,10 @@ def test_inferred_roots_cover_a_disconnected_cycle(
     environment = Environment(
         platform="linux-64",
         explicit_packages=[
-            _package("root", depends=("leaf",)),
-            _package("leaf"),
-            _package("cycle-a", depends=("cycle-b",)),
-            _package("cycle-b", depends=("cycle-a",)),
+            package_record("root", depends=("leaf",)),
+            package_record("leaf"),
+            package_record("cycle-a", depends=("cycle-b",)),
+            package_record("cycle-b", depends=("cycle-a",)),
         ],
     )
 
@@ -192,13 +230,13 @@ def test_inferred_roots_cover_a_disconnected_cycle(
         export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
     )
     root = document["metadata"]["component"]
-    dependencies = _dependencies(document)
+    dependencies = dependency_map(document)
 
     assert dependencies[root["bom-ref"]] == [
-        _component(document, "cycle-a")["bom-ref"],
-        _component(document, "root")["bom-ref"],
+        component_named(document, "cycle-a")["bom-ref"],
+        component_named(document, "root")["bom-ref"],
     ]
-    assert _properties(root)["conda:environment:root-dependency-source"] == (
+    assert component_properties(root)["conda:environment:root-dependency-source"] == (
         "inferred-graph-roots"
     )
     assert document["compositions"] == [
@@ -214,8 +252,8 @@ def test_export_is_deterministic_for_reordered_records(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1720000000")
-    first = _package("first", depends=("second",))
-    second = _package("second")
+    first = package_record("first", depends=("second",))
+    second = package_record("second")
 
     forward = Environment(
         platform="linux-64",
@@ -244,19 +282,19 @@ def test_local_source_paths_are_not_serialized(
     environment = Environment(
         platform="linux-64",
         explicit_packages=[
-            _package(
+            package_record(
                 "private-posix",
                 channel=f"file://{posix_path}",
                 url=f"file://{posix_path}/linux-64/{posix_filename}",
                 filename=f"{posix_path}/{posix_filename}",
             ),
-            _package(
+            package_record(
                 "private-windows",
                 channel=windows_path,
                 url=f"{windows_path}\\{windows_filename}",
                 filename=f"{windows_path}\\{windows_filename}",
             ),
-            _package(
+            package_record(
                 "private-relative",
                 channel=relative_path,
                 url=f"{relative_path}/{relative_filename}",
@@ -272,8 +310,8 @@ def test_local_source_paths_are_not_serialized(
     assert windows_path not in output
     assert relative_path not in output
     for name in ("private-posix", "private-windows", "private-relative"):
-        component = _component(document, name)
-        assert _properties(component)["conda:package:filename"] == (
+        component = component_named(document, name)
+        assert component_properties(component)["conda:package:filename"] == (
             f"{name}-1.0-h123_0.conda"
         )
         assert "channel=" not in component["purl"]
@@ -297,7 +335,7 @@ def test_local_environment_names_are_not_serialized(
         name=name,
         prefix=name,
         platform="linux-64",
-        explicit_packages=[_package("example")],
+        explicit_packages=[package_record("example")],
     )
 
     output = export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
@@ -316,7 +354,7 @@ def test_invalid_source_date_epoch_fails(
     monkeypatch.setenv("SOURCE_DATE_EPOCH", epoch)
     environment = Environment(
         platform="linux-64",
-        explicit_packages=[_package("example")],
+        explicit_packages=[package_record("example")],
     )
 
     with pytest.raises(CondaValueError, match="SOURCE_DATE_EPOCH"):
@@ -327,7 +365,7 @@ def test_invalid_hash_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
     environment = Environment(
         platform="linux-64",
-        explicit_packages=[_package("example", sha256="not-a-sha256")],
+        explicit_packages=[package_record("example", sha256="not-a-sha256")],
     )
 
     with pytest.raises(CondaValueError, match="Invalid SHA-256 hash"):
@@ -351,6 +389,7 @@ def test_plugin_registration() -> None:
     assert exporters[0].name == "cyclonedx-json-v1.7"
     assert exporters[0].aliases == ("cyclonedx-json", "cyclonedx", "cdx-json")
     assert exporters[0].environment_format is EnvironmentFormat.environment
+    assert exporters[0].export is export_cyclonedx_json
 
 
 def test_conda_discovers_and_runs_exporter(monkeypatch: pytest.MonkeyPatch) -> None:

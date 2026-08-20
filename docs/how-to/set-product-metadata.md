@@ -126,10 +126,10 @@ Python callers can supply the metadata for one call without changing conda's
 active configuration:
 
 ```python
-from conda_sboms.cyclonedx import export_cyclonedx_json
+from conda_sboms.cyclonedx import CycloneDXExporter
 from conda_sboms.settings import CycloneDXExportMetadata
 
-document = export_cyclonedx_json(
+document = CycloneDXExporter(
     environment,
     metadata=CycloneDXExportMetadata(
         product_name="Acme Runtime",
@@ -141,9 +141,9 @@ document = export_cyclonedx_json(
         author_organization="Acme Product Security",
         author_organization_url="https://acme.example/security",
     ),
-)
+).export()
 ```
 
 `environment` is the resolved `conda.models.environment.Environment` passed to
 an environment exporter. Supplying `CycloneDXExportMetadata` bypasses the
-active conda plugin settings for that call.
+active conda plugin settings for that exporter.
