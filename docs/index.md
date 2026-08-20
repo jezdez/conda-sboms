@@ -76,6 +76,7 @@ tutorials/getting-started
 :caption: How-to guides
 
 how-to/install
+how-to/set-product-metadata
 how-to/conda-workspaces
 how-to/reproducible-output
 ```

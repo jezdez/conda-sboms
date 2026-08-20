@@ -38,6 +38,11 @@ conda export --name my-environment --from-history \
 `--from-history` asks conda to preserve the requested package roots when its
 history contains them. The SBOM still contains every resolved conda package.
 
+Use the
+[product metadata guide](https://jezdez.github.io/conda-sboms/how-to/set-product-metadata/)
+to identify a shipped product, its manufacturer, and the person or organization
+that authored the SBOM.
+
 For a disposable example, follow the
 [getting-started tutorial](https://jezdez.github.io/conda-sboms/tutorials/getting-started/).
 The [installation guide](https://jezdez.github.io/conda-sboms/how-to/install/)
@@ -53,15 +58,15 @@ conda package URLs, and dependency relationships.
 ## Scope and limitations
 
 The exporter does not inspect package contents, discover vendored or statically
-linked software, include packages from other ecosystems, identify a
-manufacturer, scan for vulnerabilities, or establish Cyber Resilience Act
-conformity. The root composition marks overall coverage as unproven.
+linked software, include packages from other ecosystems, infer a manufacturer,
+scan for vulnerabilities, or establish Cyber Resilience Act conformity. The
+root composition marks overall coverage as unproven.
 Conda-specific properties record known external-package, virtual-package, and
 missing-dependency counts supplied by the input.
 
-Read the [documentation](https://jezdez.github.io/conda-sboms/) for the format
-reference, conda-workspaces integration, reproducible output, and coverage
-limits.
+Read the [documentation](https://jezdez.github.io/conda-sboms/) for product
+metadata, the format reference, conda-workspaces integration, reproducible
+output, and coverage limits.
 
 ## Development
 

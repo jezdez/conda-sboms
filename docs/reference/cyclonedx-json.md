@@ -48,6 +48,20 @@ Conda and other clients construct the `Environment` before invoking the
 exporter. This is why installed prefixes and resolved workspace locks work but
 an unresolved list of requirements does not.
 
+The Python callback has this signature:
+
+```python
+export_cyclonedx_json(
+    environment: Environment,
+    *,
+    metadata: CycloneDXExportMetadata | None = None,
+) -> str
+```
+
+When `metadata` is `None`, the callback reads conda's active plugin settings.
+An explicit `CycloneDXExportMetadata` object replaces those settings for that
+call.
+
 ## Document metadata
 
 | CycloneDX field | Source |
@@ -58,16 +72,55 @@ an unresolved list of requirements does not.
 | `version` | `1` for each newly generated document |
 | `metadata.timestamp` | Current UTC time or `SOURCE_DATE_EPOCH` |
 | `metadata.tools.components` | `conda-sboms` and its installed version |
-| `metadata.component` | The exported conda environment |
+| `metadata.manufacturer` | Configured organization that authored the SBOM |
+| `metadata.authors` | Configured person who authored the SBOM |
+| `metadata.component` | The exported environment or configured product |
 
 The optional `serialNumber` is omitted so unchanged inputs can produce
 byte-for-byte identical output.
 
+The author fields are omitted when their values are absent. They describe who
+created the SBOM and remain separate from the `conda-sboms` generating tool.
+
+## Product metadata settings
+
+The exporter reads these optional values from conda's plugin configuration:
+
+| Conda setting | CycloneDX field |
+| --- | --- |
+| `plugins.conda_sboms_product_name` | `metadata.component.name` |
+| `plugins.conda_sboms_product_version` | `metadata.component.version` |
+| `plugins.conda_sboms_product_manufacturer` | `metadata.component.manufacturer.name` |
+| `plugins.conda_sboms_product_manufacturer_url` | `metadata.component.manufacturer.url[]` |
+| `plugins.conda_sboms_author_name` | `metadata.authors[].name` |
+| `plugins.conda_sboms_author_email` | `metadata.authors[].email` |
+| `plugins.conda_sboms_author_organization` | `metadata.manufacturer.name` |
+| `plugins.conda_sboms_author_organization_url` | `metadata.manufacturer.url[]` |
+
+The environment-variable form uppercases the setting and prefixes it with
+`CONDA_PLUGINS_`. For example,
+`plugins.conda_sboms_product_name` becomes
+`CONDA_PLUGINS_CONDA_SBOMS_PRODUCT_NAME`.
+
+Values are stripped of surrounding whitespace, and empty values are omitted.
+The product name and version must be configured together, and a product
+manufacturer requires both. An author email requires an author name. An
+organization URL requires the corresponding organization name. URLs must use
+HTTP or HTTPS and must not contain credentials, query strings, fragments, or
+malformed percent escapes. Product versions longer than 1024 characters are
+rejected to match the CycloneDX 1.7 component limit.
+
+These settings are caller-owned data. The exporter never fills them from a
+conda channel. See [Add product and author metadata](../how-to/set-product-metadata.md)
+for commands and lifecycle guidance.
+
 ## Root component
 
-The environment is an `application` component. A safe logical environment name
-is preserved. A path-shaped name from `conda export --prefix` becomes
-`conda-environment` so the document does not expose the local prefix.
+The environment is an `application` component. When product name and version
+are configured, they identify that component and its BOM reference. Otherwise a
+safe logical environment name is preserved. A path-shaped name from
+`conda export --prefix` becomes `conda-environment` so the document does not
+expose the local prefix.
 
 The root has these properties:
 
@@ -141,6 +194,14 @@ The exporter explicitly rejects:
 
 - input without exact package records
 - a supplied SHA-256 or MD5 value has the wrong length or contains non-hex data
+- a product name or version is supplied without the other value
+- a product manufacturer is supplied without product identity
+- an author email or organization URL is supplied without its corresponding
+  name
+- a product version exceeds the CycloneDX 1024-character limit
+- an author email is malformed
+- an organization URL is not HTTP or HTTPS, contains credentials, a query, or a
+  fragment, or contains malformed percent escapes
 - `SOURCE_DATE_EPOCH` is negative, malformed, or outside the platform's
   supported timestamp range
 

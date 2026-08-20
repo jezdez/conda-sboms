@@ -29,7 +29,8 @@ The exporter also omits:
 
 - packages from pip and other external ecosystems
 - virtual packages and operating-system components
-- supplier, producer, manufacturer, and SBOM author identities
+- supplier and creator identities for individual package components
+- product manufacturer and SBOM author identities unless supplied by the caller
 - vulnerability, VEX, signature, and attestation data
 
 The root composition marks overall coverage as unproven. Conda-specific

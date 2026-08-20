@@ -16,6 +16,7 @@ from cyclonedx.validation.json import JsonStrictValidator
 
 from conda_sboms.cyclonedx import export_cyclonedx_json
 from conda_sboms.plugin import conda_environment_exporters
+from conda_sboms.settings import CycloneDXExportMetadata
 
 
 def _package(
@@ -103,7 +104,7 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
         virtual_packages=[virtual],
     )
 
-    output = export_cyclonedx_json(environment)
+    output = export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
     document = json.loads(output)
 
     assert output.endswith("\n")
@@ -113,6 +114,8 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
     assert "serialNumber" not in document
     assert document["metadata"]["timestamp"] == "1970-01-01T00:00:00+00:00"
     assert document["metadata"]["tools"]["components"][0]["name"] == "conda-sboms"
+    assert "authors" not in document["metadata"]
+    assert "manufacturer" not in document["metadata"]
 
     python_component = _component(document, "python")
     assert python_component["purl"] == (
@@ -141,6 +144,8 @@ def test_export_maps_resolved_environment(monkeypatch: pytest.MonkeyPatch) -> No
 
     root = document["metadata"]["component"]
     assert root["name"] == "demo"
+    assert "version" not in root
+    assert "manufacturer" not in root
     assert "/Users/alice/private-prefix" not in output
     root_properties = _properties(root)
     assert root_properties["conda:environment:root-dependency-source"] == (
@@ -183,7 +188,9 @@ def test_inferred_roots_cover_a_disconnected_cycle(
         ],
     )
 
-    document = json.loads(export_cyclonedx_json(environment))
+    document = json.loads(
+        export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
+    )
     root = document["metadata"]["component"]
     dependencies = _dependencies(document)
 
@@ -219,7 +226,9 @@ def test_export_is_deterministic_for_reordered_records(
         explicit_packages=[second, first],
     )
 
-    assert export_cyclonedx_json(forward) == export_cyclonedx_json(reverse)
+    assert export_cyclonedx_json(
+        forward, metadata=CycloneDXExportMetadata()
+    ) == export_cyclonedx_json(reverse, metadata=CycloneDXExportMetadata())
 
 
 def test_local_source_paths_are_not_serialized(
@@ -256,7 +265,7 @@ def test_local_source_paths_are_not_serialized(
         ],
     )
 
-    output = export_cyclonedx_json(environment)
+    output = export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
     document = json.loads(output)
 
     assert posix_path not in output
@@ -291,7 +300,7 @@ def test_local_environment_names_are_not_serialized(
         explicit_packages=[_package("example")],
     )
 
-    output = export_cyclonedx_json(environment)
+    output = export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
     root = json.loads(output)["metadata"]["component"]
 
     assert "private-environment" not in output
@@ -311,7 +320,7 @@ def test_invalid_source_date_epoch_fails(
     )
 
     with pytest.raises(CondaValueError, match="SOURCE_DATE_EPOCH"):
-        export_cyclonedx_json(environment)
+        export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
 
 
 def test_invalid_hash_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -322,7 +331,7 @@ def test_invalid_hash_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     with pytest.raises(CondaValueError, match="Invalid SHA-256 hash"):
-        export_cyclonedx_json(environment)
+        export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
 
 
 def test_export_requires_exact_records() -> None:
@@ -332,7 +341,7 @@ def test_export_requires_exact_records() -> None:
     )
 
     with pytest.raises(CondaValueError, match="requires exact package records"):
-        export_cyclonedx_json(environment)
+        export_cyclonedx_json(environment, metadata=CycloneDXExportMetadata())
 
 
 def test_plugin_registration() -> None:
@@ -348,6 +357,20 @@ def test_conda_discovers_and_runs_exporter(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
     environment = os.environ.copy()
     environment["CONDA_NO_PLUGINS"] = "false"
+    environment["CONDA_PLUGINS_CONDA_SBOMS_PRODUCT_NAME"] = "  Acme Runtime  "
+    environment["CONDA_PLUGINS_CONDA_SBOMS_PRODUCT_VERSION"] = "2026.08"
+    environment["CONDA_PLUGINS_CONDA_SBOMS_PRODUCT_MANUFACTURER"] = "Acme GmbH"
+    environment["CONDA_PLUGINS_CONDA_SBOMS_PRODUCT_MANUFACTURER_URL"] = (
+        "https://acme.example/products/runtime"
+    )
+    environment["CONDA_PLUGINS_CONDA_SBOMS_AUTHOR_NAME"] = "Alice Example"
+    environment["CONDA_PLUGINS_CONDA_SBOMS_AUTHOR_EMAIL"] = "alice@acme.example"
+    environment["CONDA_PLUGINS_CONDA_SBOMS_AUTHOR_ORGANIZATION"] = (
+        "Acme Product Security"
+    )
+    environment["CONDA_PLUGINS_CONDA_SBOMS_AUTHOR_ORGANIZATION_URL"] = (
+        "https://acme.example/security"
+    )
 
     completed = subprocess.run(
         [
@@ -368,6 +391,24 @@ def test_conda_discovers_and_runs_exporter(monkeypatch: pytest.MonkeyPatch) -> N
     document = json.loads(completed.stdout)
 
     assert document["specVersion"] == "1.7"
+    assert document["metadata"]["authors"] == [
+        {"email": "alice@acme.example", "name": "Alice Example"}
+    ]
+    assert document["metadata"]["manufacturer"] == {
+        "name": "Acme Product Security",
+        "url": ["https://acme.example/security"],
+    }
+    root = document["metadata"]["component"]
+    assert root["name"] == "Acme Runtime"
+    assert root["version"] == "2026.08"
+    assert root["manufacturer"] == {
+        "name": "Acme GmbH",
+        "url": ["https://acme.example/products/runtime"],
+    }
+    assert root["bom-ref"].startswith(
+        "conda-environment:Acme%20Runtime@2026.08?platform="
+    )
+    assert document["metadata"]["tools"]["components"][0]["name"] == "conda-sboms"
     assert (
         JsonStrictValidator(SchemaVersion.V1_7).validate_str(completed.stdout) is None
     )

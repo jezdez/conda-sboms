@@ -38,8 +38,9 @@ conda export `
 The exporter sorts components, dependency entries, dependency targets, and JSON
 keys. It omits the optional random CycloneDX serial number. With the same
 `Environment` input, including requested, external, and virtual packages, the
-same environment name and platform, the same exporter and serializer versions,
-and the same epoch, a second export is byte-for-byte identical.
+same environment name and platform, the same product and author metadata, the
+same exporter and serializer versions, and the same epoch, a second export is
+byte-for-byte identical.
 
 The value must be an integer greater than or equal to zero. An invalid,
 negative, or unrepresentable timestamp fails the export instead of silently
