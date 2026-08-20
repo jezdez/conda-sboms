@@ -48,7 +48,38 @@ Conda and other clients construct the `Environment` before invoking the
 exporter. This is why installed prefixes and resolved workspace locks work but
 an unresolved list of requirements does not.
 
-The Python callback has this signature:
+## Python API
+
+The object API consists of four public classes:
+
+| Class | Responsibility |
+| --- | --- |
+| `CycloneDXExportMetadata(...)` | Validate caller-supplied product and author metadata |
+| `CycloneDXPackage(record)` | Map one exact `PackageRecord` to a CycloneDX component |
+| `CycloneDXDependencyGraph(packages)` | Build dependency edges and select product roots |
+| `CycloneDXExporter(environment, *, metadata=None)` | Build and serialize the complete CycloneDX document |
+
+Their public state is part of the API:
+
+| Class | Public members |
+| --- | --- |
+| `CycloneDXPackage` | `record`, `component` |
+| `CycloneDXDependencyGraph` | `references_by_name`, `components_by_reference`, `edges`, `missing_edge_count`, `incomplete_references`, `root_references(requested_packages)` |
+| `CycloneDXExporter` | `packages`, `graph`, `root_references`, `roots_inferred`, `root_completeness`, `metadata`, `root`, `timestamp`, `export()` |
+
+Use `CycloneDXExporter` directly when calling the exporter from Python:
+
+```python
+from conda_sboms.cyclonedx import CycloneDXExporter
+from conda_sboms.settings import CycloneDXExportMetadata
+
+document = CycloneDXExporter(
+    environment,
+    metadata=CycloneDXExportMetadata(...),
+).export()
+```
+
+The conda plugin hook uses the public callback with this signature:
 
 ```python
 export_cyclonedx_json(
@@ -60,7 +91,10 @@ export_cyclonedx_json(
 
 When `metadata` is `None`, the callback reads conda's active plugin settings.
 An explicit `CycloneDXExportMetadata` object replaces those settings for that
-call.
+call. `CycloneDXExporter` follows the same rule.
+
+An exporter instance is a snapshot of its environment, metadata, and creation
+time. Construct a new instance after changing any of those inputs.
 
 ## Document metadata
 

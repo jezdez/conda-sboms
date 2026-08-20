@@ -67,6 +67,11 @@
   functions for framework callbacks, required APIs, or operations with no
   meaningful object owner.
 
+- Keep `CycloneDXExportMetadata`, `CycloneDXPackage`,
+  `CycloneDXDependencyGraph`, and `CycloneDXExporter` as the public object API.
+  Keep their mapping, graph, and serialization behavior on those classes rather
+  than moving it into private classes or standalone private helpers.
+
 - Do not create stateless utility classes or methods that only wrap one
   expression. Inline short one-use glue in the class that owns it.
 

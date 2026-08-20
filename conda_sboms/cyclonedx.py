@@ -37,16 +37,13 @@ if TYPE_CHECKING:
     from conda.models.records import PackageRecord
     from cyclonedx.model.bom_ref import BomRef
 
-# cyclonedx-python-lib requires a UUID even though the serialized field is removed.
-_SERIAL_NUMBER_PLACEHOLDER = UUID("00000000-0000-4000-8000-000000000000")
-
 FORMAT: Final = "cyclonedx-json-v1.7"
 ALIASES: Final = ("cyclonedx-json", "cyclonedx", "cdx-json")
 DEFAULT_FILENAMES: Final = ("*.cdx.json",)
 DESCRIPTION: Final = "CycloneDX 1.7 JSON software bill of materials"
 
 
-class _CycloneDXPackage:
+class CycloneDXPackage:
     """A resolved conda package represented as a CycloneDX component."""
 
     def __init__(self, record: PackageRecord) -> None:
@@ -161,10 +158,10 @@ class _CycloneDXPackage:
         )
 
 
-class _CycloneDXDependencyGraph:
+class CycloneDXDependencyGraph:
     """Dependency state derived from the resolved conda packages."""
 
-    def __init__(self, packages: list[_CycloneDXPackage]) -> None:
+    def __init__(self, packages: list[CycloneDXPackage]) -> None:
         self.references_by_name = {
             package.record.name.lower(): package.component.bom_ref
             for package in packages
@@ -239,13 +236,14 @@ class _CycloneDXDependencyGraph:
         return roots
 
 
-class _CycloneDXExporter:
+class CycloneDXExporter:
     """Build a CycloneDX 1.7 document from a resolved conda environment."""
 
     def __init__(
         self,
         environment: Environment,
-        metadata: CycloneDXExportMetadata,
+        *,
+        metadata: CycloneDXExportMetadata | None = None,
     ) -> None:
         if not environment.explicit_packages:
             raise CondaValueError(
@@ -262,8 +260,8 @@ class _CycloneDXExporter:
                 record.subdir,
             ),
         )
-        self.packages = [_CycloneDXPackage(record) for record in records]
-        self.graph = _CycloneDXDependencyGraph(self.packages)
+        self.packages = [CycloneDXPackage(record) for record in records]
+        self.graph = CycloneDXDependencyGraph(self.packages)
         self.root_references = self.graph.root_references(
             environment.requested_packages
         )
@@ -272,9 +270,11 @@ class _CycloneDXExporter:
             "incomplete" if any(environment.external_packages.values()) else "unknown"
         )
 
-        self.metadata = metadata
-        name = metadata.product_name or str(environment.name or "")
-        if not metadata.product_name and (not name or "/" in name or "\\" in name):
+        self.metadata = (
+            metadata if metadata is not None else CycloneDXExportMetadata.from_context()
+        )
+        name = self.metadata.product_name or str(environment.name or "")
+        if not self.metadata.product_name and (not name or "/" in name or "\\" in name):
             name = "conda-environment"
         root_source = (
             "inferred-graph-roots" if self.roots_inferred else "requested-packages"
@@ -312,26 +312,26 @@ class _CycloneDXExporter:
                 )
             )
         identity = quote(name, safe="")
-        if metadata.product_version:
-            identity += f"@{quote(metadata.product_version, safe='')}"
+        if self.metadata.product_version:
+            identity += f"@{quote(self.metadata.product_version, safe='')}"
         self.root = Component(
             type=ComponentType.APPLICATION,
             name=name,
-            version=metadata.product_version,
+            version=self.metadata.product_version,
             bom_ref=(
                 f"conda-environment:{identity}"
                 f"?platform={quote(environment.platform, safe='')}"
             ),
             manufacturer=(
                 OrganizationalEntity(
-                    name=metadata.product_manufacturer,
+                    name=self.metadata.product_manufacturer,
                     urls=(
-                        [XsUri(metadata.product_manufacturer_url)]
-                        if metadata.product_manufacturer_url
+                        [XsUri(self.metadata.product_manufacturer_url)]
+                        if self.metadata.product_manufacturer_url
                         else None
                     ),
                 )
-                if metadata.product_manufacturer
+                if self.metadata.product_manufacturer
                 else None
             ),
             properties=properties,
@@ -361,8 +361,9 @@ class _CycloneDXExporter:
             purl=PackageURL(type="pypi", name="conda-sboms", version=__version__),
         )
         components = [package.component for package in self.packages]
+        # cyclonedx-python-lib requires a UUID even though it is removed below.
         bom = Bom(
-            serial_number=_SERIAL_NUMBER_PLACEHOLDER,
+            serial_number=UUID("00000000-0000-4000-8000-000000000000"),
             metadata=BomMetaData(
                 timestamp=self.timestamp,
                 tools=ToolRepository(components=[tool]),
@@ -438,7 +439,4 @@ def export_cyclonedx_json(
     metadata: CycloneDXExportMetadata | None = None,
 ) -> str:
     """Export a resolved conda environment as CycloneDX 1.7 JSON."""
-    return _CycloneDXExporter(
-        environment,
-        metadata if metadata is not None else CycloneDXExportMetadata.from_context(),
-    ).export()
+    return CycloneDXExporter(environment, metadata=metadata).export()
