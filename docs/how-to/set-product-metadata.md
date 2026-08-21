@@ -1,5 +1,9 @@
 # Add product and author metadata
 
+:::{versionadded} 0.2.0
+Product, manufacturer, and SBOM author metadata.
+:::
+
 By default, the root component describes the exported conda environment and the
 document identifies only `conda-sboms` as the generating tool. Supply product,
 manufacturer, and author values when the environment belongs to a product for
@@ -80,14 +84,11 @@ export made with that configuration:
 conda config --set plugins.conda_sboms_product_name "Acme Runtime"
 conda config --set plugins.conda_sboms_product_version "2026.08"
 conda config --set plugins.conda_sboms_product_manufacturer "Acme GmbH"
-conda config --set plugins.conda_sboms_product_manufacturer_url \
-  "https://acme.example"
+conda config --set plugins.conda_sboms_product_manufacturer_url "https://acme.example"
 conda config --set plugins.conda_sboms_author_name "Alice Example"
 conda config --set plugins.conda_sboms_author_email "alice@acme.example"
-conda config --set plugins.conda_sboms_author_organization \
-  "Acme Product Security"
-conda config --set plugins.conda_sboms_author_organization_url \
-  "https://acme.example/security"
+conda config --set plugins.conda_sboms_author_organization "Acme Product Security"
+conda config --set plugins.conda_sboms_author_organization_url "https://acme.example/security"
 ```
 
 Inspect the active values before exporting another product:

@@ -14,8 +14,12 @@ For a standard conda installation, activate `base` and install the plugin:
 
 ```console
 conda activate base
-conda pypi install conda-sboms
+conda pypi install "conda-sboms>=0.2.0"
 ```
+
+`conda pypi install` is pending removal in conda 27.9. If the command is not
+available, use the pip method below. The `conda-pypi` channel does not currently
+serve `conda-sboms`.
 
 Confirm that the same conda installation discovers the exporter:
 
@@ -35,7 +39,7 @@ If `conda pypi` is not available, activate the environment that owns the
 `conda` executable and install the same wheel directly:
 
 ```console
-python -m pip install conda-sboms
+python -m pip install "conda-sboms>=0.2.0"
 ```
 
 ## Run from a source checkout

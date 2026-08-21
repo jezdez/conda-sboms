@@ -33,11 +33,11 @@ Generate and inspect a CycloneDX SBOM from a small conda environment.
 :::
 
 :::{grid-item-card} {octicon}`tools` How-to guides
-:link: how-to/install
-:link-type: doc
 
-Install the plugin into the environment that owns `conda`, including from
-source.
+- [Install the plugin](how-to/install.md)
+- [Add product and author metadata](how-to/set-product-metadata.md)
+- [Export a conda-workspaces environment](how-to/conda-workspaces.md)
+- [Produce reproducible output](how-to/reproducible-output.md)
 :::
 
 :::{grid-item-card} {octicon}`list-unordered` Reference

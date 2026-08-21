@@ -50,6 +50,10 @@ an unresolved list of requirements does not.
 
 ## Python API
 
+:::{versionadded} 0.2.0
+The public object API and explicit per-call metadata.
+:::
+
 The object API consists of four public classes:
 
 | Class | Responsibility |
@@ -59,13 +63,43 @@ The object API consists of four public classes:
 | `CycloneDXDependencyGraph(packages)` | Build dependency edges and select product roots |
 | `CycloneDXExporter(environment, *, metadata=None)` | Build and serialize the complete CycloneDX document |
 
+The exact call signatures are:
+
+```text
+CycloneDXExportMetadata(
+    product_name: str | None = None,
+    product_version: str | None = None,
+    product_manufacturer: str | None = None,
+    product_manufacturer_url: str | None = None,
+    author_name: str | None = None,
+    author_email: str | None = None,
+    author_organization: str | None = None,
+    author_organization_url: str | None = None,
+)
+CycloneDXPackage(record: PackageRecord)
+CycloneDXDependencyGraph(packages: list[CycloneDXPackage])
+CycloneDXDependencyGraph.root_references(
+    requested_packages: list[MatchSpec],
+) -> list[BomRef]
+CycloneDXExporter(
+    environment: Environment,
+    *,
+    metadata: CycloneDXExportMetadata | None = None,
+)
+CycloneDXExporter.export() -> str
+```
+
 Their public state is part of the API:
 
 | Class | Public members |
 | --- | --- |
+| `CycloneDXExportMetadata` | `product_name`, `product_version`, `product_manufacturer`, `product_manufacturer_url`, `author_name`, `author_email`, `author_organization`, `author_organization_url` |
 | `CycloneDXPackage` | `record`, `component` |
 | `CycloneDXDependencyGraph` | `references_by_name`, `components_by_reference`, `edges`, `missing_edge_count`, `incomplete_references`, `root_references(requested_packages)` |
 | `CycloneDXExporter` | `packages`, `graph`, `root_references`, `roots_inferred`, `root_completeness`, `metadata`, `root`, `timestamp`, `export()` |
+
+`CycloneDXExportMetadata` instances are immutable. Construction strips
+surrounding whitespace from string values and converts empty values to `None`.
 
 Use `CycloneDXExporter` directly when calling the exporter from Python:
 
@@ -75,7 +109,10 @@ from conda_sboms.settings import CycloneDXExportMetadata
 
 document = CycloneDXExporter(
     environment,
-    metadata=CycloneDXExportMetadata(...),
+    metadata=CycloneDXExportMetadata(
+        product_name="Acme Runtime",
+        product_version="2026.08",
+    ),
 ).export()
 ```
 
@@ -118,6 +155,10 @@ created the SBOM and remain separate from the `conda-sboms` generating tool.
 
 ## Product metadata settings
 
+:::{versionadded} 0.2.0
+Conda plugin settings for product, manufacturer, and SBOM author metadata.
+:::
+
 The exporter reads these optional values from conda's plugin configuration:
 
 | Conda setting | CycloneDX field |
@@ -140,9 +181,9 @@ Values are stripped of surrounding whitespace, and empty values are omitted.
 The product name and version must be configured together, and a product
 manufacturer requires both. An author email requires an author name. An
 organization URL requires the corresponding organization name. URLs must use
-HTTP or HTTPS and must not contain credentials, query strings, fragments, or
-malformed percent escapes. Product versions longer than 1024 characters are
-rejected to match the CycloneDX 1.7 component limit.
+HTTP or HTTPS and must not contain credentials, whitespace, query strings,
+fragments, or malformed percent escapes. Product versions longer than 1024
+characters are rejected to match the CycloneDX 1.7 component limit.
 
 These settings are caller-owned data. The exporter never fills them from a
 conda channel. See [Add product and author metadata](../how-to/set-product-metadata.md)
@@ -227,15 +268,15 @@ basename before serialization.
 The exporter explicitly rejects:
 
 - input without exact package records
-- a supplied SHA-256 or MD5 value has the wrong length or contains non-hex data
+- a supplied SHA-256 or MD5 value with the wrong length or non-hex data
 - a product name or version is supplied without the other value
 - a product manufacturer is supplied without product identity
 - an author email or organization URL is supplied without its corresponding
   name
 - a product version exceeds the CycloneDX 1024-character limit
 - an author email is malformed
-- an organization URL is not HTTP or HTTPS, contains credentials, a query, or a
-  fragment, or contains malformed percent escapes
+- an organization URL is not HTTP or HTTPS or contains credentials, whitespace,
+  a query, a fragment, or malformed percent escapes
 - `SOURCE_DATE_EPOCH` is negative, malformed, or outside the platform's
   supported timestamp range
 
