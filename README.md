@@ -20,7 +20,7 @@ PyPI as a conda package:
 
 ```console
 conda activate base
-conda pypi install conda-sboms
+conda pypi install "conda-sboms>=0.2.0"
 ```
 
 If `conda pypi` is not available, follow the
@@ -38,7 +38,7 @@ conda export --name my-environment --from-history \
 `--from-history` asks conda to preserve the requested package roots when its
 history contains them. The SBOM still contains every resolved conda package.
 
-Use the
+With `conda-sboms` 0.2.0 or newer, use the
 [product metadata guide](https://jezdez.github.io/conda-sboms/how-to/set-product-metadata/)
 to identify a shipped product, its manufacturer, and the person or organization
 that authored the SBOM.

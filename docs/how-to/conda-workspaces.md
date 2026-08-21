@@ -2,7 +2,16 @@
 
 `conda workspace export` uses the same exporter plugin hook as `conda export`.
 Install `conda-sboms` and `conda-workspaces` into the environment that owns the
-`conda` executable before using these commands.
+`conda` executable before using these commands. The behavior described below
+requires conda-workspaces 0.8.0 or newer.
+
+For a standard conda installation, activate `base` and install both plugins:
+
+```console
+conda activate base
+conda install --channel conda-forge "conda-workspaces>=0.8.0"
+conda pypi install "conda-sboms>=0.2.0"
+```
 
 The CycloneDX exporter requires exact package records. A declared workspace
 manifest contains requirements rather than a solved package inventory, so use
@@ -56,6 +65,8 @@ conda workspace export \
 metadata is available, the root source is `requested-packages`. Otherwise the
 exporter falls back to graph-root inference.
 
-Running the command without `--from-lockfile` or `--from-prefix` supplies only
-declared requirements. `conda-sboms` rejects that input because it does not
-contain exact package records.
+Without `--from-lockfile` or `--from-prefix`, conda-workspaces supplies only
+declared requirements. For one selected platform, `conda-sboms` rejects that
+input because it does not contain exact package records. A multi-platform
+workspace can fail earlier because the CycloneDX exporter accepts one platform
+per document.

@@ -12,7 +12,7 @@ graph as CycloneDX 1.7 JSON, and inspects the result.
 
 ```console
 conda activate base
-conda pypi install conda-sboms
+conda pypi install "conda-sboms>=0.2.0"
 ```
 
 Confirm that conda discovered the exporter:
@@ -28,6 +28,10 @@ aliases `cyclonedx-json`, `cyclonedx`, and `cdx-json`.
 
 Create a local prefix with Python and Requests:
 
+::::{tab-set}
+
+:::{tab-item} POSIX
+
 ```console
 conda create \
   --prefix ./build/tutorial-environment \
@@ -36,10 +40,30 @@ conda create \
   python=3.13 requests
 ```
 
+:::
+
+:::{tab-item} PowerShell
+
+```powershell
+conda create `
+  --prefix ./build/tutorial-environment `
+  --channel conda-forge `
+  --yes `
+  python=3.13 requests
+```
+
+:::
+
+::::
+
 This command gives conda both the requested packages and the complete solved
 package set. The exporter uses both parts of that record.
 
 ## Export the SBOM
+
+::::{tab-set}
+
+:::{tab-item} POSIX
 
 ```console
 conda export \
@@ -49,12 +73,32 @@ conda export \
   --file build/tutorial-environment.cdx.json
 ```
 
+:::
+
+:::{tab-item} PowerShell
+
+```powershell
+conda export `
+  --prefix ./build/tutorial-environment `
+  --from-history `
+  --format cyclonedx-json `
+  --file build/tutorial-environment.cdx.json
+```
+
+:::
+
+::::
+
 `--from-history` asks conda to retain `python` and `requests` as the requested
 roots. The exporter still writes every resolved conda package as a component.
 
 ## Inspect the document
 
 Print the format, root component, root source, and component count:
+
+::::{tab-set}
+
+:::{tab-item} POSIX
 
 ```console
 python - <<'PY'
@@ -73,6 +117,31 @@ print(len(document["components"]), "components")
 PY
 ```
 
+:::
+
+:::{tab-item} PowerShell
+
+```powershell
+@'
+import json
+from pathlib import Path
+
+path = Path("build/tutorial-environment.cdx.json")
+document = json.loads(path.read_text(encoding="utf-8"))
+root = document["metadata"]["component"]
+properties = {item["name"]: item["value"] for item in root["properties"]}
+
+print(document["bomFormat"], document["specVersion"])
+print(root["name"])
+print(properties["conda:environment:root-dependency-source"])
+print(len(document["components"]), "components")
+'@ | python -
+```
+
+:::
+
+::::
+
 The result reports CycloneDX 1.7, uses `conda-environment` instead of exposing
 the local prefix path, and reports `requested-packages` as the root dependency
 source. The exact component count depends on the current solve.
@@ -86,6 +155,10 @@ The corresponding entry in `dependencies` points to its resolved dependencies.
 
 Remove the tutorial environment and generated SBOM:
 
+::::{tab-set}
+
+:::{tab-item} POSIX
+
 ```console
 conda remove \
   --prefix ./build/tutorial-environment \
@@ -94,8 +167,26 @@ conda remove \
 rm build/tutorial-environment.cdx.json
 ```
 
+:::
+
+:::{tab-item} PowerShell
+
+```powershell
+conda remove `
+  --prefix ./build/tutorial-environment `
+  --all `
+  --yes
+Remove-Item build/tutorial-environment.cdx.json
+```
+
+:::
+
+::::
+
 ## Next steps
 
+- Identify a shipped product and its SBOM author with
+  [product metadata](../how-to/set-product-metadata.md).
 - Use the [CycloneDX JSON reference](../reference/cyclonedx-json.md) to interpret
   each field.
 - Make repeated exports byte-for-byte stable with
