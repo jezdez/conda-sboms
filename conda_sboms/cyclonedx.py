@@ -244,6 +244,7 @@ class CycloneDXExporter:
         environment: Environment,
         *,
         metadata: CycloneDXExportMetadata | None = None,
+        output_reproducible: bool = False,
     ) -> None:
         if not environment.explicit_packages:
             raise CondaValueError(
@@ -337,8 +338,11 @@ class CycloneDXExporter:
             properties=properties,
         )
 
+        self.output_reproducible = output_reproducible
         epoch = os.environ.get("SOURCE_DATE_EPOCH")
-        if epoch is None:
+        if output_reproducible:
+            self.timestamp = None
+        elif epoch is None:
             self.timestamp = datetime.now(timezone.utc)
         else:
             try:
@@ -361,7 +365,8 @@ class CycloneDXExporter:
             purl=PackageURL(type="pypi", name="conda-sboms", version=__version__),
         )
         components = [package.component for package in self.packages]
-        # cyclonedx-python-lib requires a UUID even though it is removed below.
+        # cyclonedx-python-lib requires a UUID and supplies a missing timestamp.
+        # Remove these optional values from the serialized document as requested below.
         bom = Bom(
             serial_number=UUID("00000000-0000-4000-8000-000000000000"),
             metadata=BomMetaData(
@@ -390,6 +395,11 @@ class CycloneDXExporter:
                     if self.metadata.author_name
                     else None
                 ),
+                properties=(
+                    [Property(name="cdx:reproducible", value="true")]
+                    if self.output_reproducible
+                    else None
+                ),
             ),
             components=components,
         )
@@ -411,6 +421,8 @@ class CycloneDXExporter:
 
         document = json.loads(JsonV1Dot7(bom).output_as_string())
         document.pop("serialNumber")
+        if self.output_reproducible:
+            document["metadata"].pop("timestamp")
         for dependency in document["dependencies"]:
             dependency.setdefault("dependsOn", [])
         root_composition = {
@@ -437,6 +449,11 @@ def export_cyclonedx_json(
     environment: Environment,
     *,
     metadata: CycloneDXExportMetadata | None = None,
+    output_reproducible: bool = False,
 ) -> str:
     """Export a resolved conda environment as CycloneDX 1.7 JSON."""
-    return CycloneDXExporter(environment, metadata=metadata).export()
+    return CycloneDXExporter(
+        environment,
+        metadata=metadata,
+        output_reproducible=output_reproducible,
+    ).export()

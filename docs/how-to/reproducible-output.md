@@ -1,8 +1,10 @@
 # Produce reproducible output
 
-By default, the SBOM timestamp records the current time. Set
-`SOURCE_DATE_EPOCH` to make the timestamp and serialized output repeatable for
-an unchanged environment and plugin version.
+By default, the SBOM timestamp records the current time. Preserve a meaningful
+timestamp with `SOURCE_DATE_EPOCH`, or omit the timestamp through the public
+Python API.
+
+## Preserve a stable timestamp
 
 Choose a non-negative Unix timestamp and export the environment.
 
@@ -45,6 +47,27 @@ byte-for-byte identical.
 The value must be an integer greater than or equal to zero. An invalid,
 negative, or unrepresentable timestamp fails the export instead of silently
 using the current time.
+
+## Omit the timestamp
+
+Clients that expose a reproducible-output option can omit time-based metadata
+through the public API:
+
+```python
+from conda_sboms.cyclonedx import export_cyclonedx_json
+
+document = export_cyclonedx_json(
+    environment,
+    output_reproducible=True,
+)
+```
+
+Explicit reproducible mode takes precedence over `SOURCE_DATE_EPOCH`. It omits
+the optional CycloneDX `metadata.timestamp` field instead of synthesizing a
+timestamp and records `cdx:reproducible=true` in `metadata.properties`. Use
+`SOURCE_DATE_EPOCH` when consumers require a timestamp. Stock `conda export`
+continues to use `SOURCE_DATE_EPOCH` because conda's exporter hook cannot pass
+format-specific options.
 
 Reproducibility does not promise identical output across different
 `conda-sboms` versions. A format update may intentionally change the document.
