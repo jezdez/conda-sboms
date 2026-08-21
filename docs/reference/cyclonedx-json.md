@@ -54,6 +54,10 @@ an unresolved list of requirements does not.
 The public object API and explicit per-call metadata.
 :::
 
+:::{versionadded} 0.3.0
+The `output_reproducible` argument and exporter state.
+:::
+
 The object API consists of four public classes:
 
 | Class | Responsibility |
@@ -61,7 +65,7 @@ The object API consists of four public classes:
 | `CycloneDXExportMetadata(...)` | Validate caller-supplied product and author metadata |
 | `CycloneDXPackage(record)` | Map one exact `PackageRecord` to a CycloneDX component |
 | `CycloneDXDependencyGraph(packages)` | Build dependency edges and select product roots |
-| `CycloneDXExporter(environment, *, metadata=None)` | Build and serialize the complete CycloneDX document |
+| `CycloneDXExporter(environment, *, metadata=None, output_reproducible=False)` | Build and serialize the complete CycloneDX document |
 
 The exact call signatures are:
 
@@ -85,6 +89,7 @@ CycloneDXExporter(
     environment: Environment,
     *,
     metadata: CycloneDXExportMetadata | None = None,
+    output_reproducible: bool = False,
 )
 CycloneDXExporter.export() -> str
 ```
@@ -96,7 +101,7 @@ Their public state is part of the API:
 | `CycloneDXExportMetadata` | `product_name`, `product_version`, `product_manufacturer`, `product_manufacturer_url`, `author_name`, `author_email`, `author_organization`, `author_organization_url` |
 | `CycloneDXPackage` | `record`, `component` |
 | `CycloneDXDependencyGraph` | `references_by_name`, `components_by_reference`, `edges`, `missing_edge_count`, `incomplete_references`, `root_references(requested_packages)` |
-| `CycloneDXExporter` | `packages`, `graph`, `root_references`, `roots_inferred`, `root_completeness`, `metadata`, `root`, `timestamp`, `export()` |
+| `CycloneDXExporter` | `packages`, `graph`, `root_references`, `roots_inferred`, `root_completeness`, `metadata`, `root`, `output_reproducible`, `timestamp`, `export()` |
 
 `CycloneDXExportMetadata` instances are immutable. Construction strips
 surrounding whitespace from string values and converts empty values to `None`.
@@ -123,6 +128,7 @@ export_cyclonedx_json(
     environment: Environment,
     *,
     metadata: CycloneDXExportMetadata | None = None,
+    output_reproducible: bool = False,
 ) -> str
 ```
 
@@ -130,8 +136,8 @@ When `metadata` is `None`, the callback reads conda's active plugin settings.
 An explicit `CycloneDXExportMetadata` object replaces those settings for that
 call. `CycloneDXExporter` follows the same rule.
 
-An exporter instance is a snapshot of its environment, metadata, and creation
-time. Construct a new instance after changing any of those inputs.
+An exporter instance is a snapshot of its environment, metadata, and timestamp
+policy. Construct a new instance after changing any of those inputs.
 
 ## Document metadata
 
@@ -141,7 +147,8 @@ time. Construct a new instance after changing any of those inputs.
 | `bomFormat` | `CycloneDX` |
 | `specVersion` | `1.7` |
 | `version` | `1` for each newly generated document |
-| `metadata.timestamp` | Current UTC time or `SOURCE_DATE_EPOCH` |
+| `metadata.timestamp` | Current UTC time, `SOURCE_DATE_EPOCH`, or omitted in reproducible mode |
+| `metadata.properties` | `cdx:reproducible=true` in reproducible mode |
 | `metadata.tools.components` | `conda-sboms` and its installed version |
 | `metadata.manufacturer` | Configured organization that authored the SBOM |
 | `metadata.authors` | Configured person who authored the SBOM |

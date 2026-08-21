@@ -103,6 +103,7 @@ def test_public_object_api(monkeypatch: pytest.MonkeyPatch) -> None:
     assert exporter.roots_inferred is False
     assert exporter.root_completeness == "unknown"
     assert exporter.root.name == "demo"
+    assert exporter.output_reproducible is False
     assert exporter.timestamp.isoformat() == "1970-01-01T00:00:00+00:00"
     assert exporter.export() == (export_cyclonedx_json(environment, metadata=metadata))
 
@@ -267,6 +268,38 @@ def test_export_is_deterministic_for_reordered_records(
     assert export_cyclonedx_json(
         forward, metadata=CycloneDXExportMetadata()
     ) == export_cyclonedx_json(reverse, metadata=CycloneDXExportMetadata())
+
+
+def test_output_reproducible_omits_timestamp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "invalid")
+    environment = Environment(
+        name="demo",
+        platform="linux-64",
+        explicit_packages=[package_record("example")],
+    )
+    exporter = CycloneDXExporter(
+        environment,
+        metadata=CycloneDXExportMetadata(),
+        output_reproducible=True,
+    )
+
+    output = exporter.export()
+    document = json.loads(output)
+
+    assert exporter.output_reproducible is True
+    assert exporter.timestamp is None
+    assert "timestamp" not in document["metadata"]
+    assert document["metadata"]["properties"] == [
+        {"name": "cdx:reproducible", "value": "true"}
+    ]
+    assert output == export_cyclonedx_json(
+        environment,
+        metadata=CycloneDXExportMetadata(),
+        output_reproducible=True,
+    )
+    assert JsonStrictValidator(SchemaVersion.V1_7).validate_str(output) is None
 
 
 def test_local_source_paths_are_not_serialized(
