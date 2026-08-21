@@ -46,7 +46,7 @@ about:
     JSON from resolved conda package records.
   license: BSD-3-Clause
   license_file: LICENSE
-  repository: https://github.com/jezdez/conda-sboms
+  repository: https://github.com/conda-incubator/conda-sboms
 
 extra:
   recipe-maintainers:

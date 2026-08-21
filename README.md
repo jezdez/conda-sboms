@@ -9,7 +9,7 @@ graph as CycloneDX 1.7 JSON. Because it uses conda's standard exporter hook,
 clients such as conda-workspaces can use the same format.
 
 The project is alpha software. Questions, bug reports, and contributions are
-[welcome on GitHub](https://github.com/jezdez/conda-sboms).
+[welcome on GitHub](https://github.com/conda-incubator/conda-sboms).
 
 ## Quick start
 
@@ -24,7 +24,7 @@ conda pypi install "conda-sboms>=0.2.0"
 ```
 
 If `conda pypi` is not available, follow the
-[installation guide](https://jezdez.github.io/conda-sboms/how-to/install/) to
+[installation guide](https://conda-incubator.github.io/conda-sboms/how-to/install/) to
 install the wheel with pip.
 
 Generate an SBOM for an installed environment:
@@ -39,13 +39,13 @@ conda export --name my-environment --from-history \
 history contains them. The SBOM still contains every resolved conda package.
 
 With `conda-sboms` 0.2.0 or newer, use the
-[product metadata guide](https://jezdez.github.io/conda-sboms/how-to/set-product-metadata/)
+[product metadata guide](https://conda-incubator.github.io/conda-sboms/how-to/set-product-metadata/)
 to identify a shipped product, its manufacturer, and the person or organization
 that authored the SBOM.
 
 For a disposable example, follow the
-[getting-started tutorial](https://jezdez.github.io/conda-sboms/tutorials/getting-started/).
-The [installation guide](https://jezdez.github.io/conda-sboms/how-to/install/)
+[getting-started tutorial](https://conda-incubator.github.io/conda-sboms/tutorials/getting-started/).
+The [installation guide](https://conda-incubator.github.io/conda-sboms/how-to/install/)
 also covers source checkouts.
 
 ## What the SBOM contains
@@ -64,7 +64,7 @@ root composition marks overall coverage as unproven.
 Conda-specific properties record known external-package, virtual-package, and
 missing-dependency counts supplied by the input.
 
-Read the [documentation](https://jezdez.github.io/conda-sboms/) for product
+Read the [documentation](https://conda-incubator.github.io/conda-sboms/) for product
 metadata, the format reference, conda-workspaces integration, reproducible
 output, and coverage limits.
 

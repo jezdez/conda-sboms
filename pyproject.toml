@@ -27,8 +27,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-documentation = "https://jezdez.github.io/conda-sboms/"
-repository = "https://github.com/jezdez/conda-sboms"
+documentation = "https://conda-incubator.github.io/conda-sboms/"
+repository = "https://github.com/conda-incubator/conda-sboms"
 
 [project.entry-points.conda]
 conda-sboms = "conda_sboms.plugin"

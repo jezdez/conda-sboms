@@ -19,12 +19,12 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/jezdez/conda-sboms",
+            "url": "https://github.com/conda-incubator/conda-sboms",
             "icon": "fa-brands fa-square-github",
             "type": "fontawesome",
         },
     ],
 }
 
-html_baseurl = "https://jezdez.github.io/conda-sboms/"
+html_baseurl = "https://conda-incubator.github.io/conda-sboms/"
 exclude_patterns = ["_build"]
