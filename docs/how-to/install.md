@@ -48,7 +48,7 @@ Use the repository's locked development environment without modifying a normal
 conda installation. Clone the repository:
 
 ```console
-git clone https://github.com/jezdez/conda-sboms.git
+git clone https://github.com/conda-incubator/conda-sboms.git
 cd conda-sboms
 ```
 
